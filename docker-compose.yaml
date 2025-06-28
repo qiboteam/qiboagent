@@ -1,48 +1,21 @@
 services:
-  ollama:
-    container_name: ollama
-    build:
-      context: .
-      dockerfile: ollama/dockerfile
+  open-webui:
     ports:
-      - "11434:11434"
+      - 8080:8080
     volumes:
-      - ollama_data:/root/.ollama
+      - ollama:/root/.ollama
+      - open-webui:/app/backend/data
+    container_name: open-webui
     restart: always
+    image: ghcr.io/open-webui/open-webui:ollama
+    environment:
+      - WEBUI_AUTH=False
+      - ENV=dev
 
-  # # Service for Open-WebUI, the user interface for interacting with Ollama.
-  # open-webui:
-  #   # Use the official Open-WebUI Docker image.
-  #   image: ghcr.io/open-webui/open-webui:main
-  #   # Set the container name for easier identification.
-  #   container_name: open-webui
-  #   # Expose port 8080 on the host machine, allowing access to the Open-WebUI interface
-  #   # through your web browser.
-  #   ports:
-  #     - "8080:8080"
-  #   # Establish a dependency: Open-WebUI will not start until the Ollama service is healthy.
-  #   depends_on:
-  #     - ollama
-  #   # Mount a named volume to persist Open-WebUI data (e.g., user configurations, chat history).
-  #   volumes:
-  #     - open-webui_data:/app/backend/data
-  #   # Set restart policy to always, so Open-WebUI restarts automatically if it crashes
-  #   # or the Docker daemon restarts.
-  #   restart: always
-  #   # Configure Open-WebUI to connect to the Ollama service.
-  #   # The hostname 'ollama' is used because it's the service name defined in this
-  #   # Docker Compose file. Docker's internal DNS resolves this to the Ollama container's IP.
-  #   environment:
-  #     - OLLAMA_API_BASE_URL=http://ollama:11434
-  #     # Customize Open-WebUI settings via environment variables (examples below):
-  #     # - WEBUI_AUTH_SECRET_KEY=your_secure_secret_key_here # For production, generate a strong key
-  #     # - WEBUI_AUTH_TRUSTED_EMAIL_DOMAINS=example.com,another.org # Allow specific email domains for signup
-  #     # - WEBUI_AUTH_DISABLE_SIGNUP=false # Set to true to disable new user signups after initial setup
-  #     # - WEBUI_AUTH_ADMIN_EMAIL=admin@example.com # Email of the initial admin user
-  #     # - WEBUI_AUTH_ALLOW_ANONYMOUS_ACCESS=false # Set to true to allow access without login
-  #     - TZ=Europe/Rome # Example: Set your local timezone
-
-# Define the named volumes used by the services.
 volumes:
-  ollama_data:
-  # open-webui_data:
+  ollama:
+    external: true
+    name: ollama
+  open-webui:
+    external: true
+    name: open-webui
