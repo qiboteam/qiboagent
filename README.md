@@ -54,3 +54,25 @@ if you want to use the model with Open WebUI, you can run the following command:
 ```console
 open-webui run serve --model <model_name>
 ```
+
+### Docker Image
+
+You can run the Open WebUI server using Docker.  
+Make sure you have [Docker installed](https://docs.docker.com/desktop/) on your system.
+
+To start the Open WebUI server, run the following command:
+```console
+docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main
+```
+
+To access the Open WebUI server, open your web browser and navigate to [http://localhost:3000](http://localhost:3000).
+
+
+### Other Options
+
+There are other ways to run the Open WebUI server.  
+For more details, refer to the official documentation:
+
+- [Open WebUI Documentation](https://docs.openwebui.com/)
+- [Ollama Documentation](https://docs.ollama.com/)
+
