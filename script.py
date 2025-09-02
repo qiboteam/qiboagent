@@ -71,12 +71,32 @@ def pull_repo(repo_url, target_dir):
     except subprocess.CalledProcessError as e:
         print(f"Error cloning repository: {e}")
 
+def pull_model(model_name):
+    try:
+        subprocess.run(['ollama', 'pull', model_name], check=True)
+        print(f"Model '{model_name}' pulled successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error pulling model: {e}")
+
+def list_models():
+    subprocess.run(['ollama', 'list'])
+
 
 def main():
     print("=== Open WebUI Knowledge Base Uploader ===")
     print()
+
+    # List available models
+    print(f"your available models are:")
+    list_models()
+
+    # Pull a specific model
+    model_name = input("Enter the model name to pull (or leave blank to skip). Visit https://ollama.com/models for a list of available models.\n").strip()
+    if model_name:
+        pull_model(model_name)
     
     # Ask for API token
+    print(f"creating a new knowledge base")
     token = input("Enter your API token: ").strip()
     if not token:
         print("Error: API token is required.")
@@ -151,6 +171,7 @@ def main():
             pbar.update(1)
 
     print(f"\nUpload complete: {success_count} files added, {error_count} errors.")
+
 
 if __name__ == "__main__":
     main()
