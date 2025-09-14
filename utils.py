@@ -345,55 +345,51 @@ def delete_knowledge_base_by_name(token, knowledge_name, base_url='http://localh
         return False
 
 
-def create_custom_model(token, model_name, base_model, knowledge_id, description=None):
+def create_custom_model(token, model_name, base_model, knowledge_id, prompt=None, description=None):
     """
-    Creates a custom model in Open WebUI using a specified base model 
-    and a linked knowledge base.
+    Creates a custom model in Open WebUI linking a knowledge base and (optional) prompt.
 
     Args:
-        token (str): Bearer authentication token for the API.
-        model_name (str): The display name for the new custom model.
-        base_model (str): The base model to use (e.g., 'llama3.2:1b').
-        knowledge_id (str): The ID of the knowledge base to link to this model.
-
-    Returns:
-        dict: The JSON response from the API if successful.
-
-    Raises:
-        requests.exceptions.HTTPError: If the API request fails.
+        token (str)
+        model_name (str)
+        base_model (str)
+        knowledge_id (str)
+        prompt (str | None): System / initial prompt to guide the model.
+        description (str | None)
     """
     url = 'http://localhost:3000/api/v1/models/create'
     headers = {
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
-
-    # Generate a unique ID for the model
     model_id = str(uuid.uuid4())
 
-    # Build the request payload
+    meta = {
+        "profile_image_url": "/static/favicon.png",
+        "description": description or f"Custom model '{model_name}' based on '{base_model}'",
+        "tags": [],
+        "suggestion_prompts": None,
+        "capabilities": {
+            "vision": False,
+            "file_upload": False,
+            "web_search": False,
+            "image_generation": False,
+            "code_interpreter": False,
+            "citations": False
+        },
+        "knowledge": [
+            {"id": knowledge_id}
+        ]
+    }
+    if prompt:
+        meta["prompt"] = prompt 
+
     data = {
         "id": model_id,
         "name": model_name,
         "base_model_id": base_model,
-        "meta": {
-            "profile_image_url": "/static/favicon.png",
-            "description": description or f"Custom model '{model_name}' based on '{base_model}'",
-            "tags": [],
-            "suggestion_prompts": None,
-            "capabilities": {
-                "vision": False,
-                "file_upload": False,
-                "web_search": False,
-                "image_generation": False,
-                "code_interpreter": False,
-                "citations": False
-            },
-            "knowledge": [
-                {"id": knowledge_id}
-            ]
-        },
-        "params": {},  # Empty params object if no extra configuration
+        "meta": meta,
+        "params": {},
         "access_control": None
     }
 

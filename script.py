@@ -79,14 +79,14 @@ def main():
                 ut.pull_repo(repo_url, repo_dir)
                 repo_dirs.append(repo_dir)
             all_files = []
-            allowed_extensions = {'.py', '.md', '.ipynb'}
+            allowed_extensions = {'.txt','.rst','.py', '.md', '.ipynb'}
             for repo_dir in repo_dirs:
                 if repo_dir.exists():
                     filtered_files = [p for p in repo_dir.rglob("*") 
                                     if p.is_file() and p.suffix.lower() in allowed_extensions]
                     all_files.extend(filtered_files)
             if not all_files:
-                print("No files found with allowed extensions (.py, .md, .ipynb).")
+                print("No files found with allowed extensions (.txt, .rst, .py, .md, .ipynb).")
                 continue
             success_count, error_count = 0, 0
             with tqdm(total=len(all_files), desc="Uploading files", unit="file") as pbar:
@@ -143,12 +143,15 @@ def main():
                 print("Error: Knowledge base ID is required.")
                 continue
             description = input("Enter a description for the custom model (optional): ").strip()
+            system_prompt = input("Enter a system prompt for the custom model (optional): ").strip()
+            if not system_prompt:
+                system_prompt = "You are a code assistant, You are specialized on Qibo Quantum Computing package. Always check the knowledge base and the documentation of Qibo before answering."
 
             if not custom_model_name or not selected_model or not selected_knowledge:
                 print("Error: First three fields are required.")
                 continue
             else:
-                ut.create_custom_model(token, custom_model_name, selected_model, selected_knowledge, description)
+                ut.create_custom_model(token, custom_model_name, selected_model, selected_knowledge, system_prompt=system_prompt, description=description)
 
         elif choice == '7':
             model_name = input("Enter the name of the custom model to delete (leave blank to cancel): ").strip()
