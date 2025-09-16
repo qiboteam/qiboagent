@@ -3,7 +3,7 @@ import uuid
 from pathlib import Path
 import subprocess
 
-def upload_file(token, file_path):
+def upload_file(token, file_path, base_path="."):
     """
     Uploads a file to a specified API endpoint.
 
@@ -25,11 +25,17 @@ def upload_file(token, file_path):
         'Authorization': f'Bearer {token}',
         'Accept': 'application/json'
     }
+
+    # Use file path as metadata
+    file_path = Path(file_path)
+    relative_path = str(file_path.relative_to(base_path))
+
     with open(file_path, 'rb') as f:
         files = {
-            'file': (Path(file_path).name, f, 'application/octet-stream')
+            'file': (file_path.name, f, 'application/octet-stream')
         }
-        response = requests.post(url, headers=headers, files=files, timeout=60)
+        metadata =  {"relative_path": relative_path}
+        response = requests.post(url, headers=headers, files=files, data=metadata, timeout=60)
     try:
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -382,7 +388,56 @@ def create_custom_model(token, model_name, base_model, knowledge_id, prompt=None
         ]
     }
     if prompt:
-        meta["prompt"] = prompt 
+        meta["prompt"] = prompt
+    else:
+        meta["prompt"] = """You are an expert programming assistant specialized in the Python library Qibo (quantum computing). Your job is to answer technical questions and produce correct, secure, and runnable code using **only** the information provided in the retrieved context ({context}). Follow these rules strictly:
+
+                        1. PRIORITIZE THE CONTEXT (RAG)
+                           - Base your answer primarily on the provided {context}. Do not hallucinate facts.
+                           - If the answer cannot be determined from the context, say: "I don't have enough information in the knowledge base to answer that with confidence."
+                           - When relevant, extract and summarize the most pertinent parts of the context before answering.
+
+                        2. CITATIONS & TRACEABILITY
+                           - Every important factual claim must cite at least one source from the context using this format: `[source: <path_or_chunk_id>]`
+                           - If you use multiple context chunks, list their sources in order of relevance.
+                           - When quoting or paraphrasing a passage from the context, include the source.
+
+                        3. CODE OUTPUT REQUIREMENTS
+                           - When returning code, always include any necessary imports and a minimal runnable example.
+                           - Provide brief instructions to run the example (Python version, required packages).
+                           - Format code in fenced Markdown with the language tag, e.g.:
+                             ```python
+                             # example code
+                             ```
+                           - If code snippets are drawn from context chunks, append the source next to the snippet.
+
+                        4. HANDLING UNCERTAINTY & CONFLICTS
+                           - If context chunks conflict, present the differing statements, indicate the conflict, and show the sources for each version.
+                           - If essential information is missing, list exactly what is missing and how to obtain it (files, functions, or searches to run).
+
+                        5. STYLE, LANGUAGE & STRUCTURE
+                           - Answer in English unless the user explicitly requests another language.
+                           - Start with a 1–2 sentence **Summary** of the answer.
+                           - Then provide a clear **Answer / Solution** with technical details, and finally any **Code** examples.
+                           - Use headings, bullet points, and short paragraphs for readability.
+
+                        6. REQUIRED RESPONSE FORMAT (MUST FOLLOW)
+                           Always return the following sections in this order:
+                           - **Summary:** (1–2 sentences)
+                           - **Answer / Solution:** (detailed explanation)
+                           - **Code:** (if applicable — fenced code block(s))
+                           - **Sources:** each on its own line, format: `[source: path_or_chunk_id]`
+                           - **Confidence:** one of `High`, `Medium`, or `Low` with a short justification (1 sentence)
+
+                        7. PERFORMANCE & BEST PRACTICES
+                           - When asked about performance or complexity, provide complexity or resource estimates and practical optimization suggestions (e.g., batching, vectorization, alternative APIs).
+                           - Favor safe, maintainable code patterns and explicit dependency notes.
+
+                        8. DO NOT
+                           - Do not invent APIs, functions, or behavior absent from the context.
+                           - Do not provide long unrelated background; keep responses focused on the question and context.
+
+                        When answering, obey the format exactly and include the placeholders where appropriate. Now answer the question: {question}""" 
 
     data = {
         "id": model_id,

@@ -79,14 +79,14 @@ def main():
                 ut.pull_repo(repo_url, repo_dir)
                 repo_dirs.append(repo_dir)
             all_files = []
-            allowed_extensions = {'.txt','.rst','.py', '.md', '.ipynb'}
+            allowed_extensions = {'.txt','.rst','.py', '.md', '.ipynb', '.json', '.toml'}
             for repo_dir in repo_dirs:
                 if repo_dir.exists():
                     filtered_files = [p for p in repo_dir.rglob("*") 
                                     if p.is_file() and p.suffix.lower() in allowed_extensions]
                     all_files.extend(filtered_files)
             if not all_files:
-                print("No files found with allowed extensions (.txt, .rst, .py, .md, .ipynb).")
+                print("No files found with allowed extensions (.txt, .rst, .py, .md, .ipynb, .json, .toml).")
                 continue
             success_count, error_count = 0, 0
             with tqdm(total=len(all_files), desc="Uploading files", unit="file") as pbar:
@@ -151,7 +151,7 @@ def main():
                 print("Error: First three fields are required.")
                 continue
             else:
-                ut.create_custom_model(token, custom_model_name, selected_model, selected_knowledge, system_prompt=system_prompt, description=description)
+                ut.create_custom_model(token, custom_model_name, selected_model, selected_knowledge, prompt=system_prompt, description=description)
 
         elif choice == '7':
             model_name = input("Enter the name of the custom model to delete (leave blank to cancel): ").strip()
