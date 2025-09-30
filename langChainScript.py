@@ -173,8 +173,8 @@ def choose_embeddings():
         elif ok == "n":
             try:
                 from langchain_ollama import OllamaEmbeddings
-                emb = OllamaEmbeddings(model="nomic-embed-text:v1.5")
-                print("Using OllamaEmbeddings: nomic-embed-text:v1.5")
+                emb = OllamaEmbeddings(model="all-minilm:22m")
+                print("Using OllamaEmbeddings: all-minilm:22m")
                 return emb
             except Exception as e:
                 print(f"Error importing OllamaEmbeddings: {e}")
@@ -271,8 +271,12 @@ def choose_ollama_model():
 def create_qa_chain(llm, retriever):
     prompt_template = PromptTemplate(input_variables=["context", "question"], template="""
 You are an expert in the Qibo quantum computing library.
-Use the following context to answer the question. Always include references to file names, cell indices and functions when relevant.
-If you don't know, say you don't know.
+Use the following context to answer the question. Always include references to file names, cell indices, and functions when relevant.
+
+IMPORTANT:
+- If the question is not answerable from the context, respond with a short generic answer or "I don't know".
+- Do NOT invent any functions, classes, or methods that do not exist in the Qibo library.
+- For simple or conversational questions (like "What is your name?", "How are you?", "What is Qibo?"), answer briefly and clearly even if not in the context. For example, "My name is QiboLLM."
 
 Context:
 {context}

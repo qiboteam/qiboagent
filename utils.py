@@ -1,5 +1,5 @@
 import requests
-import uuid
+import uuid 
 from pathlib import Path
 import subprocess
 
@@ -19,7 +19,8 @@ def upload_file(token, file_path, base_path="."):
         ValueError: If the response does not contain the file ID.
     """
 
-    # For more details refer to the API documentation (https://docs.openwebui.com/getting-started/api-endpoints/  RAG section)
+    # For more details refer to the API documentation
+    # (https://docs.openwebui.com/getting-started/api-endpoints/  RAG section)
     url = 'http://localhost:3000/api/v1/files/'
     headers = {
         'Authorization': f'Bearer {token}',
@@ -90,7 +91,7 @@ def add_file_to_knowledge(token, knowledge_id, file_id):
 
 def get_or_create_knowledge(token, knowledge_name, description=None):
     """
-    Retrieves the ID of an existing knowledge base by name, or creates a new one if it does not exist.
+    Retrieves the ID of an existing knowledge base by name, or creates new one if it does not exist.
 
     Args:
         token (str): Bearer authentication token for the API.
@@ -196,7 +197,7 @@ def list_models():
     Raises:
         subprocess.CalledProcessError: If the ollama list command fails.
     """
-    subprocess.run(['ollama', 'list'])
+    subprocess.run(['ollama', 'list'], check=True)
     print("")
 
 def remove_model(model_name):
@@ -321,7 +322,7 @@ def delete_knowledge_base_by_id(token, knowledge_id, base_url='http://localhost:
                 detail = resp.json()
             except Exception:
                 detail = resp.text
-            print(f"Failed to delete knowledge '{knowledge_id}' (HTTP {resp.status_code}): {detail}")
+            print(f"Failed to delete knowledge '{knowledge_id}' (HTTP {resp.status_code}):{detail}")
             return False
     except requests.exceptions.RequestException as e:
         print(f"Connection error while deleting knowledge '{knowledge_id}': {e}")
