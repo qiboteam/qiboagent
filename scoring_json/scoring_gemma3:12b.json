@@ -1,0 +1,18 @@
+[
+  {
+    "model": "gemma3:12b",
+    "question": "How do I set numpy as the backend in the Qibo library?",
+    "correctness": 1,
+    "grounding": 0.3333333333333333,
+    "hallucination": 1,
+    "pylint score": 1.0
+  },
+  {
+    "model": "gemma3:12b",
+    "question": "Write Python code to implement a Quantum Fourier Transform (QFT) on 5 qubits using the Qibo library, and then provide the code to visualize (use draw()) the corresponding circuit.",
+    "correctness": 1,
+    "grounding": 1.0,
+    "hallucination": 1,
+    "pylint score": 0.25
+  }
+]

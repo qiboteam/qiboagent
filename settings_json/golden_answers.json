@@ -1,0 +1,16 @@
+{
+    "How do I set numpy as the backend in the Qibo library?" : {
+        "expected_output" : "Using numpy backend on",
+        "expected_sources" : ["qiboKnow/qibo/doc/source/api-reference/qibo.rst",
+                              "qiboKnow/qibo/doc/source/getting-started/installation.rst",
+                               "qiboKnow/qibo/src/qibo/backends/init.py"]
+    },
+    
+    "Write Python code to implement a Quantum Fourier Transform (QFT) on 5 qubits using the Qibo library, and then provide the code to visualize (use draw()) the corresponding circuit." : {
+        "expected_output" : ["0: ─H─U1─U1─U1─U1───────────────────────────x───\n1: ───o──|──|──|──H─U1─U1─U1────────────────|─x─\n2: ──────o──|──|────o──|──|──H─U1─U1────────|─|─\n3: ─────────o──|───────o──|────o──|──H─U1───|─x─\n4: ────────────o──────────o───────o────o──H─x───", ""],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/examples.rst",
+                              "qiboKnow/qibo/README.md",
+                              "qiboKnow/qibo/src/qibo/models/qft.py",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py"]    
+    }
+}

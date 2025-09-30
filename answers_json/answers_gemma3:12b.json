@@ -1,0 +1,29 @@
+[
+  {
+    "question": "How do I set numpy as the backend in the Qibo library?",
+    "answer": "You can set the numpy backend in the Qibo library using the `qibo.set_backend()` function. Here's how:\n\n```python\nimport qibo\nqibo.set_backend(\"numpy\")\n```\n\nThis code imports the `qibo` library and then uses `qibo.set_backend(\"numpy\")` to switch the active backend to numpy. This makes numpy the computational engine for your quantum circuits.\n",
+    "sources": [
+      "qiboKnow/qibo/doc/source/api-reference/qibo.rst",
+      "qiboKnow/qibo/doc/source/code-examples/examples.rst",
+      "qiboKnow/qibo/doc/source/code-examples/tutorials/qcnn_classifier/qcnn_demo.ipynb [cell 5]",
+      "qiboKnow/qibo/doc/source/getting-started/backends.rst",
+      "qiboKnow/qibo/examples/qclustering/train_qkmedians.py",
+      "qiboKnow/qibo/src/qibo/backends/__init__.py",
+      "qiboKnow/qibo/src/qibo/quantum_info/hamming_weight.py",
+      "qiboKnow/qibo/tests/test_parameter.py"
+    ]
+  },
+  {
+    "question": "Write Python code to implement a Quantum Fourier Transform (QFT) on 5 qubits using the Qibo library, and then provide the code to visualize (use draw()) the corresponding circuit.",
+    "answer": "```python\nfrom qibo import gates, set_backend\nfrom qibo.models import Circuit, QFT\n\n# Create a QFT circuit with 5 qubits\ncircuit = QFT(5)\n\n# Visualize the circuit\ncircuit.draw()\n```\n\nThis code creates a QFT circuit with 5 qubits using `QFT(5)`. Then, the `draw()` method is called on the circuit to display a visual representation of the circuit.\n",
+    "sources": [
+      "qiboKnow/qibo/README.md",
+      "qiboKnow/qibo/doc/source/code-examples/advancedexamples.rst",
+      "qiboKnow/qibo/doc/source/code-examples/examples.rst",
+      "qiboKnow/qibo/examples/circuit-draw-mpl/qibo-draw-circuit-matplotlib.ipynb [cell 11]",
+      "qiboKnow/qibo/src/qibo/models/circuit.py",
+      "qiboKnow/qibo/src/qibo/models/qft.py",
+      "qiboKnow/qibo/tests/test_models_qcnn.py"
+    ]
+  }
+]

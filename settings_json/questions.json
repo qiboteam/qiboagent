@@ -1,0 +1,4 @@
+[
+  "How do I set numpy as the backend in the Qibo library?",
+  "Write Python code to implement a Quantum Fourier Transform (QFT) on 5 qubits using the Qibo library, and then provide the code to visualize (use draw()) the corresponding circuit."
+]
