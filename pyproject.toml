@@ -8,19 +8,19 @@ readme = "README.md"
 python = ">=3.11,<3.14"
 
 # LangChain core + components
-langchain = "*"
-langchain-community = "*"
-langchain-chroma = "*"
-langchain-ollama = "*"
+langchain = "0.3.27"
+langchain-community = "0.3.29"
+langchain-chroma = "0.2.5"
+langchain-ollama = "0.3.8"
 
 # Utility libraries
-nbformat = "*"
+nbformat = "5.10.4"
 
 # Qibo library
 qibo = "^0.2.21"
 
 [tool.poetry.group.dev.dependencies]
-pylint = "*"
+pylint = "3.3.8"
 
 [build-system]
 requires = ["poetry-core"]
