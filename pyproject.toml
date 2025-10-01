@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "qibo-rag"
+version = "0.1.0"
+description = "RAG pipeline for Qibo documentation using LangChain, with auto-scoring of answers."
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.14"
+
+# LangChain core + components
+langchain = "*"
+langchain-community = "*"
+langchain-chroma = "*"
+langchain-ollama = "*"
+
+# Utility libraries
+nbformat = "*"
+
+# Qibo library
+qibo = "^0.2.21"
+
+[tool.poetry.group.dev.dependencies]
+pylint = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -343,6 +343,23 @@ def extract_code(answer: str) -> str:
 def main():
     settings = load_json_settings("./settings_json/settings.json")
     data_dir = settings["data_dir"] if "data_dir" in settings else "./qiboKnow"
+    qibo_dir = Path(data_dir) / "qibo"
+    if not qibo_dir.exists():
+        logger.info("Cloning Qibo repository into %s", qibo_dir)
+        try:
+            subprocess.run(
+                ["git", "clone", "https://github.com/qiboteam/qibo.git", str(qibo_dir)],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            logger.info("Qibo repository cloned successfully.")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to clone Qibo repository: {e.stderr}")
+            sys.exit(1)
+    else:
+        logger.info("Qibo directory already exists at %s", qibo_dir)
     persist_dir = settings["persist_dir"] if "persist_dir" in settings else "./chroma_qiboKnow"
     questions_file = "./settings_json/questions.json"
     output_file = f"./answers_json/answers_{settings['llm']['model_name'].replace('/', '_')}.json"
