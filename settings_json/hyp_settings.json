@@ -1,6 +1,6 @@
 {
   "data_dir": "./qiboKnow",
-  "persist_dir": "./chroma_qiboKnow",
+  "persist_dir": "None",
   "rebuild": false,
   "embedding": {
     "type": "ollama",

@@ -22,6 +22,7 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain_ollama import OllamaEmbeddings
 from langchain_ollama import OllamaLLM
+from tqdm import tqdm
 
 
 
@@ -142,6 +143,38 @@ Context:
 {context}
 
 Question: {question}
+
+EXAMPLE:
+
+Question:
+
+Build a qibo circuit of 1 qubit, add an H gate to it, execute it and save the final state to the file `state.npy`.
+
+Answer:
+
+```python
+
+import numpy as np
+from qibo import Circuit, gates
+
+c = Circuit(1)
+c.add(gates.H(0))
+
+state = c().state()
+
+with open('state.npy', 'wb') as f:
+
+    np.save(f, state)
+
+```
+
+Explanation:
+You can append gates to a Circuit object through the method `add` and execute the circuit simply by calling it `c()`, then you can extract the final state by using the `state` method from the resulting object.
+
+Sources:
+- qiboKnow/qibo/doc/source/code-examples/examples.rst
+- qiboKnow/qibo/src/qibo/models/circuit.py
+- qiboKnow/qibo/src/qibo/gates/gates.py
 """
     )
     qa_chain = RetrievalQA.from_chain_type(
@@ -156,7 +189,7 @@ Question: {question}
 def run_batch(qa_chain, retriever, questions: List[str], output_file: str):
     """Run a batch of questions through the QA chain and save results to a JSON file."""
     results = []
-    for q in questions:
+    for q in tqdm(questions, desc="Processing questions"):
         try:
             relevant_docs = retriever.invoke(q)
         except Exception as e:
@@ -184,6 +217,7 @@ def run_batch(qa_chain, retriever, questions: List[str], output_file: str):
             "answer": answer,
             "sources": list(sorted(set(sources)))
         })
+
 
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)

@@ -1,4 +1,18 @@
 [
   "How do I set numpy as the backend in the Qibo library?",
-  "Write Python code to implement a Quantum Fourier Transform (QFT) on 5 qubits using the Qibo library, and then provide the code to visualize (use draw()) the corresponding circuit."
+  "Using qibo write a code example of a quantum circuit with two qbits, with an Hadamard gate for each, execute the circuit and print the result state.",
+  "How do i set numpy backend and complex64 as simulation data type in qibo library?",
+  "Using qibo create a quantum circuit with two qbits, add an hadamard gate for each and a X gate on the second. invert the circuit and draw the original circuit and the inverted one.",
+  "Write Python code to implement a Quantum Fourier Transform (QFT) on 5 qubits using the Qibo library, and then provide the code to visualize (use draw()) the corresponding circuit.",
+  "Using Qibo library, print the eigenvalues and the ground state of the Transverse field Ising model Hamiltonian (TFIM) with 4 qbits, use the built in methods.",
+  "Provide a complete Python code, using the Qibo library, to create a 2-qubit quantum circuit. The circuit should apply an X gate to qubit 0, followed by a measurement gate on both qubits. Finally, execute the circuit with 100 shots and print the entire resulting measurement object.",
+  "Write Python code using Qibo package to create a 3-qubit quantum circuit.  Add the following gates in order: RX on qubit 0, RY on qubit 1, CZ between qubits 1 and 2, fSim between qubits 0 and 2, and H on qubit 2, initialize all gate parameters to zero. Finally, set the circuit parameters with the values [0.123, 0.456, (0.789, 0.321)] respectively. Execute the circuit and print the final state.",
+  "Write a complete Python code using Qibo that prepares a qubit in the $|+\rangle$ state and evolve it for a given time $t=1$ under the Hamiltonian $H=X$ (pauli x). The final code should print the state vector of the evolved qubit.",
+  "Use a Hadamard gate to create a superposition. Starting from the $\\mid 0\\rangle$ state with one qbit, write a complete Python code using Qibo library to apply the H gate on the qbit. Print the resulting state from the circuit and print the state density histogram using built-in methods.",
+  "Using the Qibo library, write a Python function called `create_bell_state` that builds a 2-qubit quantum circuit to generate the Bell state \\(|\\Phi^+\\rangle = (|00\\rangle + |11\\rangle)/\\sqrt{2}\\). The circuit should apply a Hadamard gate on the first qubit, followed by a CNOT gate with the second qubit as the target. At the end of the program, print the final quantum state.",
+  "Using the qibo library, write Python code that performs an adiabatic evolution for a transverse field Ising model (TFIM) with 4 qubits. Use the Pauli-X Hamiltonian as the initial Hamiltonian and the Heisenberg XXZ Hamiltonian as the problem Hamiltonian. Set the total evolution time to 1, a linear interpolation schedule, and time step dt=1e-2. Print the final quantum state after the evolution.",
+  "Using the Qibo library, write a Python function that implements Deutsch’s algorithm for a balanced function. The function should prepare two qubits (the first in state |0⟩ and the second in state |1⟩), apply Hadamard gates to both qubits, implement the oracle for a balanced function (f(x) = x as a CNOT with the first qubit as control and the second as target), apply another Hadamard gate to the first qubit, and finally measure the first qubit. The function should return the circuit, print the circuit diagram using draw(). Print also the measurement result of the first qubit after executing the circuit."
 ]
+
+
+
