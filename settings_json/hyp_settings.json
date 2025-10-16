@@ -1,14 +1,14 @@
 {
   "data_dir": "./qiboKnow",
   "persist_dir": "None",
-  "rebuild": false,
+  "rebuild": true,
   "embedding": {
     "type": "ollama",
     "model_name": "all-minilm:22m"
   },
   "llm": {
     "provider": "ollama",
-    "model_name": "llama3.2:1b"
+    "model_name": "gemma3:12b"
   },
   "retriever": {
     "search_type": "mmr",

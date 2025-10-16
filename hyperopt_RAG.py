@@ -11,8 +11,13 @@ from typing import List
 import re
 import tempfile
 import subprocess
+import datetime
+import gc
+import argparse
 import sys
 import nbformat
+from tqdm import tqdm
+import optuna
 
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter, Language
@@ -22,9 +27,8 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain_ollama import OllamaEmbeddings
 from langchain_ollama import OllamaLLM
-from tqdm import tqdm
-import optuna
-import argparse
+from langchain_huggingface import HuggingFaceEmbeddings
+
 
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -51,7 +55,10 @@ def load_documents(root: str) -> List[Document]:
     loader_py = DirectoryLoader(str(root_path), glob=["**/*.py"], show_progress=True)
     docs_py = loader_py.load()
 
-    loader_rst = DirectoryLoader(str(root_path), glob=["**/*.rst"], loader_cls=TextLoader, loader_kwargs={"encoding": "utf-8"}, show_progress=True)
+    loader_rst = DirectoryLoader(str(root_path), glob=["**/*.rst"],
+                                 loader_cls=TextLoader,
+                                 loader_kwargs={"encoding": "utf-8"},
+                                 show_progress=True)
     docs_rst = loader_rst.load()
 
     nb_docs: List[Document] = []
@@ -82,7 +89,7 @@ def load_json_settings(file_path: str) -> dict:
         return {}
 
 
-def split_docs(docs: List[Document], 
+def split_docs(docs: List[Document],
                md_chunk_size: int = 500, md_chunk_overlap: int = 50,
                py_chunk_size: int = 500, py_chunk_overlap: int = 50,
                rst_chunk_size: int = 500, rst_chunk_overlap: int = 50) -> List[Document]:
@@ -119,7 +126,10 @@ def split_docs(docs: List[Document],
     return chunks
 
 
-def build_vectorstore(chunks: List[Document], embedding_model, persist_directory: str, rebuild: bool = True):
+def build_vectorstore(chunks: List[Document],
+                      embedding_model,
+                      persist_directory: str,
+                      rebuild: bool = True):
     """Build or load a Chroma vector store from document chunks."""
     p = Path(persist_directory) if persist_directory else None
 
@@ -133,9 +143,9 @@ def build_vectorstore(chunks: List[Document], embedding_model, persist_directory
         try:
             vectordb.persist()
         except Exception:
-            logger.debug("Chroma.persist() failed; continuing without explicit persist.", exc_info=True)
+            logger.debug("Chroma.persist() failed; continuing without explicit persist.",
+                         exc_info=True)
     else:
-        # In-memory chroma for optuna trials
         vectordb = Chroma.from_documents(chunks, embedding_model)
 
     return vectordb
@@ -201,9 +211,36 @@ Sources:
         llm=llm,
         retriever=retriever,
         chain_type="stuff",
-        chain_type_kwargs={"prompt": prompt_template}
+        chain_type_kwargs={"prompt": prompt_template},
+        return_source_documents=True
     )
     return qa_chain
+
+def extract_sources_from_docs(docs: List[Document]) -> List[str]:
+    """Extract metadata sources from a list of Document objects used for the answer."""
+    sources = []
+    for d in docs:
+        m = d.metadata or {}
+        src = (
+            m.get("source")
+            or m.get("file_path")
+            or m.get("filepath")
+            or m.get("path")
+            or m.get("document_path")
+            or m.get("source_file")
+            or m.get("id")
+            or "<inline>"
+        )
+        cell = m.get("cell_index")
+        if cell is not None:
+            sources.append(f"{src} [cell {cell}]")
+        else:
+            sources.append(str(src))
+    return sorted(set(sources))
+
+
+def _normalize_text(s: str) -> str:
+    return re.sub(r"\s+", " ", s.strip())
 
 
 def run_batch(qa_chain, retriever, questions: List[str], output_file: str | None = None, save: bool = True):
@@ -211,31 +248,50 @@ def run_batch(qa_chain, retriever, questions: List[str], output_file: str | None
     results = []
     for q in tqdm(questions, desc="Processing questions"):
         try:
-            relevant_docs = retriever.invoke(q)
-        except Exception as e:
-            logger.error(f"Error retrieving docs for '{q}': {e}")
-            relevant_docs = []
-
-        try:
             response = qa_chain.invoke({"query": q})
-            answer = response.get("result", "")
+            answer = response.get("result") or response.get("output_text", "")
+            docs = response.get("source_documents") or []
         except Exception as e:
             logger.error(f"Error answering '{q}': {e}")
-            answer = ""
+            answer, docs = "", []
 
-        sources = []
-        for d in relevant_docs:
-            src = d.metadata.get("source", "<inline>")
-            cell = d.metadata.get("cell_index")
-            if cell is not None:
-                sources.append(f"{src} [cell {cell}]")
-            else:
-                sources.append(src)
+        if not docs:
+            try:
+                docs = getattr(retriever, "get_relevant_documents", retriever.invoke)(q)
+            except Exception as e:
+                logger.error(f"Error retrieving docs for '{q}': {e}")
+                docs = []
+
+        sources = extract_sources_from_docs(docs)
+
+        code = extract_code(answer)
+        code_output = {"stdout": "", "stderr": ""}
+        if code:
+            with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
+                tmp.write(code)
+                tmp_path = tmp.name
+            try:
+                proc = subprocess.run([sys.executable, tmp_path],
+                                      capture_output=True,
+                                      text=True, timeout=30,
+                                      check=False)
+                code_output["stdout"] = (proc.stdout or "").strip()
+                code_output["stderr"] = (proc.stderr or "").strip()
+            except subprocess.TimeoutExpired:
+                code_output["stderr"] = "Execution timeout (30s)"
+            except Exception as e:
+                code_output["stderr"] = f"Error executing code: {e}"
+            finally:
+                try:
+                    Path(tmp_path).unlink()
+                except Exception:
+                    pass
 
         results.append({
             "question": q,
             "answer": answer,
-            "sources": list(sorted(set(sources)))
+            "sources": sources,
+            "output": code_output
         })
 
     if save and output_file:
@@ -271,11 +327,11 @@ def get_pylint_score(
             cmd,
             capture_output=True,
             text=True,
-            timeout=timeout
+            timeout=timeout,
+            check=False
         )
 
         output = proc.stdout + "\n" + proc.stderr
-        
         match = re.search(r"rated at\s+(-?\d+(?:\.\d+)?)/10", output, re.IGNORECASE)
         if match:
             try:
@@ -304,7 +360,11 @@ def get_pylint_score(
     return 0.0
 
 
-def auto_scoring(results: list, golden_answers: dict, model_name: str, save: bool = False, scoring_path: str | None = None):
+def auto_scoring(results: list,
+                 golden_answers: dict,
+                 model_name: str,
+                 save: bool = False,
+                 scoring_path: str | None = None):
     """Score batch answers. Se save=False non scrive su disco."""
     scores = []
     for result in results:
@@ -316,7 +376,8 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str, save: boo
             "correctness": 0,
             "grounding": 0,
             "hallucination": 1,
-            "pylint score": 0.0
+            "pylint score": 0.0,
+            "error": None
         }
         answer = result["answer"]
         raw_expected_output = golden_answer.get("expected_output", "")
@@ -329,42 +390,54 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str, save: boo
 
         code = extract_code(answer)
 
-        if code:
+        stdout = _normalize_text(result.get("output", {}).get("stdout", "")) if result.get("output") else ""
+        stderr = _normalize_text(result.get("output", {}).get("stderr", "")) if result.get("output") else ""
+        if code and not (stdout or stderr):
             with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
                 tmp.write(code)
                 tmp_path = tmp.name
             try:
-                proc = subprocess.run(
-                    ["python3", tmp_path],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
-                stdout = proc.stdout.strip()
-                stderr = proc.stderr.strip()
-                combined = (stdout + "\n" + stderr).strip()
-
-                if expected_outputs and any(eo in combined for eo in expected_outputs):
-                    score["correctness"] = 1
-                if ("AttributeError" in stderr) or ("NameError" in stderr) or ("ImportError" in stderr) or ("ModuleNotFoundError" in stderr):
-                    score["hallucination"] = 0
-
-                score["pylint score"] = get_pylint_score(
-                    tmp_path,
-                    disable="missing-module-docstring,missing-final-newline"
-                )
-
+                proc = subprocess.run([sys.executable, tmp_path],
+                                      capture_output=True, text=True,
+                                      timeout=30,
+                                      check=False)
+                stdout = _normalize_text(proc.stdout or "")
+                stderr = _normalize_text(proc.stderr or "")
             except subprocess.TimeoutExpired:
-                logger.warning(f"Timeout executing code for question: {question}")
+                stderr = "Execution timeout (30s)"
             except Exception as e:
-                logger.warning(f"Error executing code: {e}")
+                stderr = f"Error executing code: {e}"
             finally:
                 try:
                     Path(tmp_path).unlink()
                 except Exception:
                     pass
 
-        # Grounding
+        combined = (stdout + " " + stderr).strip()
+        if stderr:
+            score["error"] = stderr
+
+        if expected_outputs and any(_normalize_text(eo) in combined for eo in expected_outputs):
+            score["correctness"] = 1
+
+        if any(k in stderr for k in ("AttributeError", "NameError", "ImportError", "ModuleNotFoundError")):
+            score["hallucination"] = 0
+
+        if code:
+            try:
+                with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
+                    tmp.write(code)
+                    tmp_path = tmp.name
+                score["pylint score"] = get_pylint_score(
+                    tmp_path,
+                    disable="missing-module-docstring,missing-final-newline"
+                )
+            finally:
+                try:
+                    Path(tmp_path).unlink()
+                except Exception:
+                    pass
+
         sources = result.get("sources", [])
         expected_sources = golden_answer.get("expected_sources", [])
         for src in expected_sources:
@@ -410,9 +483,13 @@ def run_once(settings: dict, save: bool = False):
     persist_dir = settings.get("persist_dir", "./chroma_qiboKnow")
     questions_file = settings.get("questions_file", "./settings_json/questions.json")
     golden_file = settings.get("golden_file", "./settings_json/golden_answers.json")
-    rebuild = settings.get("rebuild", False) if save else False
+    rebuild = settings.get("rebuild", False)
 
-    embedding_model = OllamaEmbeddings(model=settings.get("embeddings_model", "all-minilm:22m"))
+    #embedding_model = OllamaEmbeddings(model=settings.get("embeddings_model", "all-minilm:22m"))
+    embedding_model = HuggingFaceEmbeddings(model_name=settings.get("embeddings_model", "all-MiniLM-L6-v2"),
+                                            model_kwargs={'device': 'cpu'})
+
+    print("Using embedding model:", embedding_model)
 
     # Build or load vectorstore
     if persist_dir and Path(persist_dir).exists() and not rebuild:
@@ -434,12 +511,12 @@ def run_once(settings: dict, save: bool = False):
         rst_chunk_overlap = ts.get("rst_chunk_overlap", 50)
         
         chunks = split_docs(
-            docs, 
-            md_chunk_size=md_chunk_size, 
+            docs,
+            md_chunk_size=md_chunk_size,
             md_chunk_overlap=md_chunk_overlap,
-            py_chunk_size=py_chunk_size, 
+            py_chunk_size=py_chunk_size,
             py_chunk_overlap=py_chunk_overlap,
-            rst_chunk_size=rst_chunk_size, 
+            rst_chunk_size=rst_chunk_size,
             rst_chunk_overlap=rst_chunk_overlap
         )
         
@@ -480,6 +557,9 @@ def run_once(settings: dict, save: bool = False):
     results = run_batch(qa_chain, retriever, questions, output_file=output_file, save=save)
 
     scores = auto_scoring(results, golden_answers, settings["llm"]["model_name"], save=save)
+    if vectordb is not None:
+        del vectordb
+        gc.collect()
     return scores
 
 
@@ -496,20 +576,18 @@ def extract_code(answer: str) -> str:
     return ""
 
 def objective(trial):
-    # Hyperparameters to optimize
+    """Objective function for Optuna hyperparameter optimization."""
+    # Always use the same parameter space for all trials
     md_chunk_size = trial.suggest_int("md_chunk_size", 200, 1000, step=100)
-    md_chunk_overlap = trial.suggest_int("md_chunk_overlap", 20, 200, step=10)
-    
+    md_chunk_overlap = trial.suggest_int("md_chunk_overlap", 20, 200, step=10)  
     py_chunk_size = trial.suggest_int("py_chunk_size", 200, 1000, step=100)
-    py_chunk_overlap = trial.suggest_int("py_chunk_overlap", 20, 200, step=10)
-    
+    py_chunk_overlap = trial.suggest_int("py_chunk_overlap", 20, 200, step=20) 
     rst_chunk_size = trial.suggest_int("rst_chunk_size", 200, 1000, step=100)
     rst_chunk_overlap = trial.suggest_int("rst_chunk_overlap", 20, 200, step=10)
-    
     search_type = trial.suggest_categorical("search_type", ["similarity", "mmr"])
-    search_k = trial.suggest_int("search_k", 1, 10)
+    search_k = trial.suggest_int("search_k", 2, 9)
 
-    # Load base settings and update with trial parameters
+    # Load base settings from JSON and update with trial parameters
     settings = load_json_settings("./settings_json/hyp_settings.json")
     settings.setdefault("text_splitter", {})
     settings["text_splitter"]["md_chunk_size"] = md_chunk_size
@@ -519,21 +597,38 @@ def objective(trial):
     settings["text_splitter"]["rst_chunk_size"] = rst_chunk_size
     settings["text_splitter"]["rst_chunk_overlap"] = rst_chunk_overlap
 
+    # Force rebuild for each trial and disable persistence
     settings["persist_dir"] = None
-    settings["rebuild"] = True  # Always rebuild for each trial
+    settings["rebuild"] = True
     
+    # Update retriever settings
     settings.setdefault("retriever", {})
     settings["retriever"]["search_type"] = search_type
     settings["retriever"]["search_k"] = search_k
 
-    # Run the pipeline
+    # Run the pipeline with current parameters
     scores = run_once(settings, save=False)
     if not scores:
         return 0.0
     
-    # Which score to optimize? Here to see if the whole pipeline works we use correctness
+    # Calculate and return average correctness score
     avg_correctness = sum(s["correctness"] for s in scores) / len(scores)
     return avg_correctness
+
+def list_existing_studies(storage):
+    """List all existing studies in the storage"""
+    try:
+        studies = optuna.study.get_all_study_summaries(storage=storage)
+        if studies:
+            logger.info("Existing studies:")
+            for study_summary in studies:
+                logger.info(f"  - {study_summary.study_name}: {study_summary.n_trials} trials")
+        else:
+            logger.info("No existing studies found")
+        return studies
+    except Exception as e:
+        logger.warning(f"Could not list studies: {e}")
+        return []
 
 
 def main():
@@ -543,7 +638,12 @@ def main():
     parser.add_argument("--study-name", type=str, default="rag-opt", help="Optuna study name")
     parser.add_argument("--resume", action="store_true", help="Resume existing study")
     parser.add_argument("--storage", type=str, default="sqlite:///optuna_rag.db", help="Optuna study storage")
+    parser.add_argument("--list-studies", action="store_true", default=False, help="List existing studies and exit")
     args = parser.parse_args()
+
+    if args.list_studies:
+        list_existing_studies(args.storage)
+        return 0
 
     # Check if resuming and if the storage file exists
     storage = args.storage
@@ -556,9 +656,25 @@ def main():
 
     # Optuna study setup
     sampler = optuna.samplers.TPESampler(seed=args.seed)
-    pruner = optuna.pruners.MedianPruner(n_startup_trials=5)
+    pruner = optuna.pruners.MedianPruner(n_startup_trials=10)
     
     try:
+        existing_studies = list_existing_studies(storage)
+        existing_studies_names = [study.study_name for study in existing_studies]
+
+        if args.study_name in existing_studies_names and not load_if_exists:
+            logger.warning(f"Study '{args.study_name}' already exists. Do you want to overwrite it? [y/n]")
+            while True:
+                user_input = input()
+                if user_input.lower() == "n":
+                    logger.info("Exiting without changes.")
+                    return 0
+                if user_input.lower() == "y":
+                    logger.info(f"Overwriting study '{args.study_name}'.")
+                    optuna.delete_study(study_name=args.study_name, storage=storage)
+                    break
+                logger.info("Please enter 'y' or 'n'.")
+                    
         study = optuna.create_study(
             direction="maximize",
             sampler=sampler,
@@ -567,6 +683,19 @@ def main():
             storage=storage,
             load_if_exists=load_if_exists
         )
+        # Enqueue a baseline trial if no trials exist
+        if len(study.trials) == 0:
+            study.enqueue_trial({
+                "md_chunk_size": 500,
+                "md_chunk_overlap": 50,
+                "py_chunk_size": 700,
+                "py_chunk_overlap": 80,
+                "rst_chunk_size": 400,
+                "rst_chunk_overlap": 50,
+                "search_type": "mmr",
+                "search_k": 8
+            })
+            logger.info("Enqueued baseline trial with fixed parameters")
         
         if load_if_exists and study.trials:
             logger.info(f"Resuming study with {len(study.trials)} existing trials")
@@ -584,7 +713,6 @@ def main():
             for _ in range(args.trials):
                 try:
                     study.optimize(objective, n_trials=1)
-                    # Aggiorna la progress bar
                     try:
                         best_val = study.best_value
                         pbar.set_postfix(best=f"{best_val:.4f}")
@@ -598,12 +726,10 @@ def main():
                             "best_params": study.best_params if hasattr(study, "best_params") else None,
                             "completed_trials": len(study.trials),
                             "timestamp": str(datetime.datetime.now())
-                        }, f, indent=2, ensure_ascii=False)
-                        
+                        }, f, indent=2, ensure_ascii=False) 
                 except KeyboardInterrupt:
                     logger.warning("Optimization interrupted by user!")
                     break
-                    
         except KeyboardInterrupt:
             logger.warning("Optimization interrupted by user!")
         finally:
@@ -639,6 +765,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import datetime
     sys.exit(main())
-

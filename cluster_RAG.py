@@ -20,16 +20,12 @@ from langchain.schema import Document
 from langchain_chroma import Chroma
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
-from langchain_ollama import OllamaEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import OllamaLLM
 from tqdm import tqdm
 
-
-
-
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
-
 
 def load_documents(root: str) -> List[Document]:
     """Load documents from the specified root directory, including .md, .py, .rst, and .ipynb files."""
@@ -74,12 +70,17 @@ def load_json_settings(file_path: str) -> dict:
         logger.error(f"Error loading JSON settings from {file_path}: {e}")
         return {}
 
-
 def split_docs(docs: List[Document]) -> List[Document]:
     """Split documents into chunks based on their type (markdown, python, rst)."""
-    md_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.MARKDOWN, chunk_size=500, chunk_overlap=50)
-    py_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.PYTHON, chunk_size=700, chunk_overlap=80)
-    rst_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.RST, chunk_size=400, chunk_overlap=50)
+    md_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.MARKDOWN,
+                                                               chunk_size=500,
+                                                               chunk_overlap=50)
+    py_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.PYTHON,
+                                                               chunk_size=700,
+                                                               chunk_overlap=80)
+    rst_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.RST,
+                                                               chunk_size=400,
+                                                               chunk_overlap=50)
 
     md_docs, py_docs, rst_docs = [], [], []
 
@@ -103,8 +104,10 @@ def split_docs(docs: List[Document]) -> List[Document]:
     logger.info(f"Total chunks created: {len(chunks)}")
     return chunks
 
-
-def build_vectorstore(chunks: List[Document], embedding_model, persist_directory: str, rebuild: bool = False):
+def build_vectorstore(chunks: List[Document],
+                      embedding_model,
+                      persist_directory: str,
+                      rebuild: bool = False):
     """Build or load a Chroma vector store from document chunks."""
     p = Path(persist_directory)
     if rebuild and p.exists():
@@ -119,7 +122,6 @@ def build_vectorstore(chunks: List[Document], embedding_model, persist_directory
         except Exception:
             pass
     return vectordb
-
 
 def create_qa_chain(llm, retriever):
     """Create a RetrievalQA chain with a custom prompt for Qibo-related questions."""
@@ -181,62 +183,93 @@ Sources:
         llm=llm,
         retriever=retriever,
         chain_type="stuff",
-        chain_type_kwargs={"prompt": prompt_template}
+        chain_type_kwargs={"prompt": prompt_template},
+        return_source_documents=True # get the source documents used for the answer
     )
     return qa_chain
 
+def extract_sources_from_docs(docs: List[Document]) -> List[str]:
+    """Extract metadata sources from a list of Document objects used for the answer."""
+    sources = []
+    for d in docs:
+        m = d.metadata or {}
+        src = m.get("source") or m.get("file_path") or m.get("filepath") or m.get("path") or m.get("document_path") or m.get("source_file") or m.get("id") or "<inline>"
+        cell = m.get("cell_index")
+        if cell is not None:
+            sources.append(f"{src} [cell {cell}]")
+        else:
+            sources.append(str(src))
+    return sorted(set(sources))
+
+def normalize_text(s: str) -> str:
+    """Normalize text to compare code outputs and expected outputs."""
+    return re.sub(r"\s+", " ", s.strip())
 
 def run_batch(qa_chain, retriever, questions: List[str], output_file: str):
     """Run a batch of questions through the QA chain and save results to a JSON file."""
     results = []
     for q in tqdm(questions, desc="Processing questions"):
         try:
-            relevant_docs = retriever.invoke(q)
-        except Exception as e:
-            logger.error(f"Error retrieving docs for '{q}': {e}")
-            relevant_docs = []
-
-        try:
             response = qa_chain.invoke({"query": q})
-            answer = response.get("result", "")
+            answer = response.get("result") or response.get("output_text", "")
+            docs = response.get("source_documents") or []
         except Exception as e:
             logger.error(f"Error answering '{q}': {e}")
-            answer = ""
+            answer, docs = "", []
 
-        sources = []
-        for d in relevant_docs:
-            src = d.metadata.get("source", "<inline>")
-            cell = d.metadata.get("cell_index")
-            if cell is not None:
-                sources.append(f"{src} [cell {cell}]")
-            else:
-                sources.append(src)
+        if not docs:
+            try:
+                docs = getattr(retriever, "get_relevant_documents", retriever.invoke)(q)
+            except Exception as e:
+                logger.error(f"Error retrieving docs for '{q}': {e}")
+                docs = []
+
+        sources = extract_sources_from_docs(docs)
+
+        code = extract_code(answer)
+        code_output = {"stdout": "", "stderr": ""}
+        if code:
+            with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
+                tmp.write(code)
+                tmp_path = tmp.name
+            try:
+                proc = subprocess.run([sys.executable, tmp_path],
+                                      capture_output=True,
+                                      text=True, timeout=30,
+                                      check=False)
+                code_output["stdout"] = (proc.stdout or "").strip()
+                code_output["stderr"] = (proc.stderr or "").strip()
+            except subprocess.TimeoutExpired:
+                code_output["stderr"] = "Execution timeout (30s)"
+            except Exception as e:
+                code_output["stderr"] = f"Error executing code: {e}"
+            finally:
+                try:
+                    Path(tmp_path).unlink()
+                except Exception:
+                    pass
 
         results.append({
             "question": q,
             "answer": answer,
-            "sources": list(sorted(set(sources)))
+            "sources": sources,
+            "output": code_output
         })
 
-
+    Path("answers_json").mkdir(exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
-
     logger.info(f"Saved {len(results)} results to {output_file}")
-
     return results
 
-
-
 def get_pylint_score(
-        
     pyfile_path: str,
     disable: str = "missing-module-docstring,missing-final-newline",
     timeout: int = 30,
 ) -> float:
     """
     Run pylint on a Python file using the current Python environment (venv) 
-    and return a normalized score (0.0..1.0). 
+    and return a normalized score [0.0, 1.0]. 
     Returns 0.0 if pylint fails or the score cannot be determined.
     """
     cmd = [
@@ -251,7 +284,8 @@ def get_pylint_score(
             cmd,
             capture_output=True,
             text=True,
-            timeout=timeout
+            timeout=timeout,
+            check=False
         )
 
         output = proc.stdout + "\n" + proc.stderr
@@ -283,9 +317,11 @@ def get_pylint_score(
 
     return 0.0
 
-
 def auto_scoring(results: list, golden_answers: dict, model_name: str):
-    """Score batch answers: execute code, match expected output, detect simple hallucinations, compute pylint score, and grounding count."""
+    """
+    Score batch answers: execute code, match expected output, detect simple hallucinations,
+    compute pylint score, and grounding count.
+    """
     scores = []
     for result in results:
         question = result["question"]
@@ -296,11 +332,11 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str):
             "correctness": 0,
             "grounding": 0,
             "hallucination": 1,
-            "pylint score": 0
+            "pylint score": 0,
+            "error": None
         }
         answer = result["answer"]
         raw_expected_output = golden_answer.get("expected_output", "")
-        # Normalize expected_output into a list of non-empty strings
         if isinstance(raw_expected_output, str):
             expected_outputs = [raw_expected_output.strip()] if raw_expected_output.strip() else []
         elif isinstance(raw_expected_output, list):
@@ -309,57 +345,62 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str):
             expected_outputs = []
         code = extract_code(answer)
 
-        if code:
+        # normalize outputs
+        stdout = normalize_text(result.get("output", {}).get("stdout", "")) if result.get("output") else ""
+        stderr = normalize_text(result.get("output", {}).get("stderr", "")) if result.get("output") else ""
+
+        if code and not (stdout or stderr):
             with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
                 tmp.write(code)
                 tmp_path = tmp.name
             try:
-                proc = subprocess.run(
-                    ["python3", tmp_path],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
-                stdout = proc.stdout.strip()
-                stderr = proc.stderr.strip()
-                combined = (stdout + "\n" + stderr).strip()
-                #logger.info(f"[{question}] STDOUT len={len(stdout)} STDERR len={len(stderr)}")
-                if expected_outputs and any(eo in combined for eo in expected_outputs):
-                    score["correctness"] = 1
-                # Hallucination signals: invented symbols / modules
-                if ("AttributeError" in stderr) or ("NameError" in stderr) or ("ImportError" in stderr) or ("ModuleNotFoundError" in stderr):
-                    score["hallucination"] = 0
-
-                score["pylint score"] = get_pylint_score(
-                    tmp_path,
-                    disable="missing-module-docstring,missing-final-newline" # maybe add import-error
-                )
-
+                proc = subprocess.run([sys.executable, tmp_path], capture_output=True, text=True, timeout=30, check=False)
+                stdout = normalize_text(proc.stdout or "")
+                stderr = normalize_text(proc.stderr or "")
             except subprocess.TimeoutExpired:
-                logger.warning(f"Timeout executing code for question: {question}")
+                stderr = "Execution timeout (30s)"
             except Exception as e:
-                logger.warning(f"Error executing code: {e}")
+                stderr = f"Error executing code: {e}"
             finally:
                 try:
                     Path(tmp_path).unlink()
                 except Exception:
                     pass
 
-        # Grounding
+        combined = (stdout + " " + stderr).strip()
+        if stderr:
+            score["error"] = stderr
+        if expected_outputs and any(normalize_text(eo) in combined for eo in expected_outputs):
+            score["correctness"] = 1
+        if any(k in stderr for k in ("AttributeError", "NameError", "ImportError", "ModuleNotFoundError")):
+            score["hallucination"] = 0
+
+        if code:
+            try:
+                with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
+                    tmp.write(code)
+                    tmp_path = tmp.name
+                score["pylint score"] = get_pylint_score(
+                    tmp_path,
+                    disable="missing-module-docstring,missing-final-newline"
+                )
+            finally:
+                try:
+                    Path(tmp_path).unlink()
+                except Exception:
+                    pass
+
         sources = result.get("sources", [])
         expected_sources = golden_answer.get("expected_sources", [])
         for src in expected_sources:
             if any(src in s for s in sources):
                 score["grounding"] += 1
-
-        score["grounding"] /= max(1, len(expected_sources))  # normalize to [0..1]
+        score["grounding"] /= max(1, len(expected_sources))
         scores.append(score)
 
     Path("scoring_json").mkdir(exist_ok=True)
     with open(f"scoring_json/scoring_{model_name.replace('/', '_')}.json", "w", encoding="utf-8") as f:
         json.dump(scores, f, indent=2, ensure_ascii=False)
-    return
-
 
 def extract_code(answer: str) -> str:
     """
@@ -372,7 +413,6 @@ def extract_code(answer: str) -> str:
     if code_blocks:
         return code_blocks[0].strip()
     return ""
-
 
 def main():
     settings = load_json_settings("./settings_json/settings.json")
@@ -400,7 +440,10 @@ def main():
     golden_file = "./settings_json/golden_answers.json"
     rebuild = settings.get("rebuild", False)
 
-    embedding_model = OllamaEmbeddings(model="all-minilm:22m")
+    embedding_model = HuggingFaceEmbeddings(
+        model_name=settings.get("embeddings_model", "sentence-transformers/all-MiniLM-L6-v2"),
+        model_kwargs={"device": "cpu"}
+    )
 
     if Path(persist_dir).exists() and not rebuild:
         vectordb = Chroma(persist_directory=persist_dir, embedding_function=embedding_model)
@@ -412,13 +455,13 @@ def main():
         chunks = split_docs(docs)
         vectordb = build_vectorstore(chunks, embedding_model, persist_dir, rebuild=rebuild)
 
-    retriever = vectordb.as_retriever(search_type=settings["retriever"]["search_type"], search_kwargs={"k": settings["retriever"]["search_k"]})
+    retriever = vectordb.as_retriever(search_type=settings["retriever"]["search_type"],
+                                      search_kwargs={"k": settings["retriever"]["search_k"]})
     
     llm = OllamaLLM(model=settings["llm"]["model_name"])
 
     qa_chain = create_qa_chain(llm, retriever)
 
-    # Load questions
     with open(questions_file, "r", encoding="utf-8") as f:
         questions = json.load(f)
 
@@ -430,3 +473,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
