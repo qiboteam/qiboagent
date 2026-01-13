@@ -1,0 +1,14 @@
+[package]
+name = "qibo_python"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "qibo_python"
+crate-type = ["cdylib"]
+
+[dependencies]
+# PyO3 for Python bindings
+pyo3 = { version = "0.20", features = ["extension-module"] }
+# Local core crate
+qibo_core = { path = "../qibo_core" }

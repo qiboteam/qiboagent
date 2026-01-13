@@ -1,0 +1,10 @@
+[package]
+name = "qibo_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[lib]
+name = "qibo_core"
+path = "src/lib.rs"
