@@ -1,14 +1,16 @@
 [package]
-name = "qibo_python"
+name = "_qibo_core"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "qibo_python"
 crate-type = ["cdylib"]
 
 [dependencies]
 # PyO3 for Python bindings
 pyo3 = { version = "0.20", features = ["extension-module"] }
-# Local core crate
+# Numpy support (updated to be compatible with pyo3 0.20)
+numpy = "0.20"
+# Core logic
 qibo_core = { path = "../qibo_core" }
+num-complex = "0.4"

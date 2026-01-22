@@ -1,2 +1,0 @@
-[workspace]
-members = ["qibo_core", "qibo_python"]
