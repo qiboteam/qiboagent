@@ -5,8 +5,39 @@ build-backend = "maturin"
 [project]
 name = "qibo_python"
 version = "0.1.0"
-requires-python = ">=3.8"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "numpy>=2.0.0,<3.0.0",
+    "qibo>=0.2.23"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "maturin>=1.0,<2.0",
+]
 
 [tool.maturin]
 python-source = "."
 module-name = "_qibo_core"
+
+[tool.poetry]
+name = "qibo_python"
+version = "0.1.0"
+description = "Python bindings for Qibo quantum computing library"
+packages = [
+    {include = "qibo_python"},
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.14"
+numpy = "^2.0"
+qibo = ">=0.2.23"
+
+[tool.poetry.group.dev.dependencies]
+maturin = "^1.0"
+pytest = "^7.0"
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+testpaths = ["tests"]
