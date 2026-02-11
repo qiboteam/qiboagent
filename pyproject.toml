@@ -1,0 +1,55 @@
+[tool.poetry]
+name = "qibollm"
+version = "0.1.0"
+description = "Scripts with RAG and Agents for Qibo"
+authors = ["Lorenzo Esposito"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.14"
+
+# --- Core LangChain Stack  ---
+langchain = "1.1.0"
+langchain-community = "0.4.1"
+langchain-core = "1.2.7"
+langgraph = "1.0.6"
+langgraph-checkpoint = "2.1.2"
+langgraph-prebuilt = "1.0.4"
+langsmith = "0.4.37"
+
+# --- LangChain Integrations ---
+langchain-openai = "1.0.0"
+langchain-anthropic = "1.0.0"
+langchain-google-genai = "4.2.0"
+langchain-mistralai = "1.0.0"
+langchain-huggingface = "1.0.0"
+langchain-ollama = "1.0.0"
+langchain-chroma = "1.0.0"
+langchain-text-splitters = "1.0.0"
+
+# --- Vector DB & Search ---
+chromadb = "1.2.0"
+rank-bm25 = "0.2.2"
+
+# --- Qibo Ecosystem ---
+qibo = "0.2.23"
+qibojit = "0.1.12"
+
+# --- Utilities & Processing ---
+pydantic = "2.12.3"
+python-dotenv = "1.1.1"
+rich = "14.2.0"
+tqdm = "4.67.1"
+nbformat = "5.10.4"
+requests = "2.32.5"
+beautifulsoup4 = "4.14.2"
+networkx = "3.4.2"
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "7.1.0"
+pytest = "8.4.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
