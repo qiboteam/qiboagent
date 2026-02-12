@@ -5,10 +5,9 @@ LLM Autoscoring without RAG
 
 import logging
 from tqdm import tqdm
-import os
 import sys
 import re
-import subprocess
+import subprocess, requests
 import json
 import tempfile
 from pathlib import Path
@@ -212,11 +211,46 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str):
     logger.info(f"Scoring results saved to {output_file}")
     return scores
 
+def check_ollama_llm_availability(model_name: str, base_url: str) -> bool:
+    """Check if an Ollama model is available; if not, attempt to pull it."""
+    # Check if Ollama server is reachable
+    try:
+        # get list of available models, ollama api: https://docs.ollama.com/api
+        response = requests.get(f"{base_url}/api/tags", timeout=5)
+    except (requests.ConnectionError, requests.Timeout):
+        logger.error(f"Cannot connect to Ollama at {base_url}. Is the server running?")
+        return False
+
+    # Check if model is already downloaded
+    model_short = model_name.split(":")[0]
+    models = response.json().get("models", [])
+    available = [m["name"].split(":")[0] for m in models]
+    if model_short in available:
+        logger.info(f"Model '{model_name}' is available.")
+        return True
+
+    # Attempt to pull the model via CLI
+    logger.info(f"Model '{model_name}' not found locally. Pulling...")
+    result = subprocess.run(["ollama", "pull", model_name])
+    if result.returncode != 0:
+        logger.error(f"Invalid model name '{model_name}'. Check available models at https://ollama.com/library")
+        return False
+
+    logger.info(f"Model '{model_name}' pulled successfully.")
+    return True
 
 def initialize_llm(settings: dict):
     """Initialize LLM based on settings configuration."""
     if settings["llm"]["provider"] == "ollama":
-        return OllamaLLM(model=settings["llm"]["model_name"], base_url=settings["llm"]["base_url"], temperature=0.0)
+        model_name = settings["llm"]["model_name"]
+        base_url = settings["llm"]["base_url"]
+        
+        # Check if model is available, pull if necessary
+        if not check_ollama_llm_availability(model_name, base_url):
+            if not check_ollama_llm_availability(settings["llm"]["model_name"], settings["llm"]["base_url"]):
+                raise RuntimeError(f"Model {model_name} is not available and could not be pulled.")
+        
+        return OllamaLLM(model=model_name, base_url=base_url, temperature=0.0)
     elif settings["llm"]["provider"] == "google_genai":
         return ChatGoogleGenerativeAI(model=settings["llm"]["model_name"],
                                       google_api_key=settings["llm"]["api_key"],
@@ -230,7 +264,7 @@ def LLM_answer_questions(llm, questions: List[str]) -> List[dict]:
     results = []
     chain = prompt | llm | StrOutputParser()
     
-    start_index = 48
+    start_index = 0
     for idx, question in enumerate(tqdm(questions[start_index:], desc="Getting LLM answers", ncols=80), start=start_index):
         try:
             #logger.info("waiting 10 mins to avoid rate limits...")

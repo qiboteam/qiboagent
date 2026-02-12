@@ -14,7 +14,7 @@ import hashlib
 import re
 import time
 import tempfile
-import subprocess
+import subprocess, requests
 import sys
 from difflib import SequenceMatcher
 from tqdm import tqdm
@@ -48,12 +48,47 @@ def load_json_settings(file_path: str) -> dict:
     except Exception as e:
         logger.error(f"Error loading JSON settings from {file_path}: {e}")
         return {}
+    
+def check_ollama_llm_availability(model_name: str, base_url: str) -> bool:
+    """Check if an Ollama model is available; if not, attempt to pull it."""
+    # Check if Ollama server is reachable
+    try:
+        # get list of available models, ollama api: https://docs.ollama.com/api
+        response = requests.get(f"{base_url}/api/tags", timeout=5)
+    except (requests.ConnectionError, requests.Timeout):
+        logger.error(f"Cannot connect to Ollama at {base_url}. Is the server running?")
+        return False
+
+    # Check if model is already downloaded
+    model_short = model_name.split(":")[0]
+    models = response.json().get("models", [])
+    available = [m["name"].split(":")[0] for m in models]
+    if model_short in available:
+        logger.info(f"Model '{model_name}' is available.")
+        return True
+
+    # Attempt to pull the model via CLI
+    logger.info(f"Model '{model_name}' not found locally. Pulling...")
+    result = subprocess.run(["ollama", "pull", model_name])
+    if result.returncode != 0:
+        logger.error(f"Invalid model name '{model_name}'. Check available models at https://ollama.com/library")
+        return False
+
+    logger.info(f"Model '{model_name}' pulled successfully.")
+    return True
+
 
 def initialize_llm(settings: dict):
     """Initialize LLM based on settings configuration."""
     if settings["llm"]["provider"] == "ollama":
-        # Be careful with your Ollama server base_url
-        return OllamaLLM(model=settings["llm"]["model_name"], base_url=settings["llm"]["base_url"], temperature=0.0)
+        model_name = settings["llm"]["model_name"]
+        base_url = settings["llm"]["base_url"]
+        
+        # Check if model is available, pull if necessary
+        if not check_ollama_llm_availability(model_name, base_url):
+            raise RuntimeError(f"Model {model_name} is not available and could not be pulled.")
+        
+        return OllamaLLM(model=model_name, base_url=base_url, temperature=0.0)
     elif settings["llm"]["provider"] == "google_genai":
         return ChatGoogleGenerativeAI(model=settings["llm"]["model_name"], temperature=0.0, google_api_key=settings["llm"]["api_key"])
     else:

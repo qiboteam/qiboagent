@@ -5,8 +5,8 @@ Agentic Pipeline for Qibo github issues resolution
 import ast
 from pathlib import Path
 from dataclasses import dataclass
-import requests
-import os,json
+import requests, subprocess
+import json
 import logging
 import json
 from rich import print as rprint
@@ -427,10 +427,42 @@ def search_code(query: str) -> str:
 #---------------------------AGENT INITIALIZATION------------------------ #
 
 
+def check_ollama_llm_availability(model_name: str, base_url: str) -> bool:
+    """Check if an Ollama model is available; if not, attempt to pull it."""
+    # Check if Ollama server is reachable
+    try:
+        # get list of available models, ollama api: https://docs.ollama.com/api
+        response = requests.get(f"{base_url}/api/tags", timeout=5)
+    except (requests.ConnectionError, requests.Timeout):
+        logger.error(f"Cannot connect to Ollama at {base_url}. Is the server running?")
+        return False
+
+    # Check if model is already downloaded
+    model_short = model_name.split(":")[0]
+    models = response.json().get("models", [])
+    available = [m["name"].split(":")[0] for m in models]
+    if model_short in available:
+        logger.info(f"Model '{model_name}' is available.")
+        return True
+
+    # Attempt to pull the model via CLI
+    logger.info(f"Model '{model_name}' not found locally. Pulling...")
+    result = subprocess.run(["ollama", "pull", model_name])
+    if result.returncode != 0:
+        logger.error(f"Invalid model name '{model_name}'. Check available models at https://ollama.com/library")
+        return False
+
+    logger.info(f"Model '{model_name}' pulled successfully.")
+    return True
+
 def init_agent(model_name: str, system_prompt: str, reasoning: bool = False, settings: dict = None):
     """Initialize the agent with the specified model, tools, and system prompt."""
     # Be careful with your Ollama server base_url
-    model = ChatOllama(model=settings["llm"]["model_name"], temperature=0.0, reasoning=settings["llm"]["reasoning"], base_url=settings["llm"]["base_url"])
+    if settings["llm"]["provider"] == "ollama":
+        # Check if model is available, pull if necessary
+        if not check_ollama_llm_availability(settings["llm"]["model_name"], settings["llm"]["base_url"]):
+            raise RuntimeError(f"Model {model_name} is not available and could not be pulled.")
+        model = ChatOllama(model=settings["llm"]["model_name"], temperature=0.0, reasoning=settings["llm"]["reasoning"], base_url=settings["llm"]["base_url"])
     checkpointer = InMemorySaver()
 
     agent = create_agent(

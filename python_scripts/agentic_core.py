@@ -6,7 +6,7 @@ import os
 import sys
 import logging
 import json
-import subprocess, shlex
+import subprocess, shlex, requests
 from pathlib import Path
 
 from langchain.agents import create_agent
@@ -471,9 +471,42 @@ def get_python_source(base_dir: Path) -> str:
 
     return "\n\n".join(context)
 
+#-------AGENT INITIALIZATION--------#
+
+def check_ollama_llm_availability(model_name: str, base_url: str) -> bool:
+    """Check if an Ollama model is available; if not, attempt to pull it."""
+    # Check if Ollama server is reachable
+    try:
+        # get list of available models, ollama api: https://docs.ollama.com/api
+        response = requests.get(f"{base_url}/api/tags", timeout=5)
+    except (requests.ConnectionError, requests.Timeout):
+        logger.error(f"Cannot connect to Ollama at {base_url}. Is the server running?")
+        return False
+
+    # Check if model is already downloaded
+    model_short = model_name.split(":")[0]
+    models = response.json().get("models", [])
+    available = [m["name"].split(":")[0] for m in models]
+    if model_short in available:
+        logger.info(f"Model '{model_name}' is available.")
+        return True
+
+    # Attempt to pull the model via CLI
+    logger.info(f"Model '{model_name}' not found locally. Pulling...")
+    result = subprocess.run(["ollama", "pull", model_name])
+    if result.returncode != 0:
+        logger.error(f"Invalid model name '{model_name}'. Check available models at https://ollama.com/library")
+        return False
+
+    logger.info(f"Model '{model_name}' pulled successfully.")
+    return True
+
 def init_agent(model_name: str, reasoning: bool, checkpointer=None, settings: dict = None):
     """Initializes the agent with the specified model and tools."""
-    model = ChatOllama(
+    if settings["llm"]["provider"] == "ollama":
+        if not check_ollama_llm_availability(model_name, settings["llm"]["base_url"]):
+            raise RuntimeError(f"Model {model_name} is not available and could not be pulled.")
+        model = ChatOllama(
         model=model_name,
         temperature=0.0,
         reasoning=reasoning,
