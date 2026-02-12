@@ -26,10 +26,10 @@ logger = logging.getLogger(__name__)
 
 OWNER = "qiboteam"
 REPO = "qibo"
-ISSUE_NUMBER = 1710 #1710 unfolded matrix product #1699 issue related to non_trainable parameters 
-SETTINGS_PATH = "../settings_json/settings.json"
-OUTPUT_FILE = "../agent_output.json"
-BASE_DIR = Path(__file__).parent / "qibo"
+ISSUE_NUMBER = 1699 #1710 unfolded matrix product #1699 issue related to non_trainable parameters 
+SETTINGS_PATH = "./settings_json/settings.json"
+OUTPUT_FILE = "./agent_outputs/agent_output.json"
+BASE_DIR = Path(__file__).parent.parent / "qiboKnow" / "qibo"
 
 # Two examples of system prompts. It's important to emphasize the general workflow and strategy.
 # If you need any special requirements, you can express them in the user prompt.
@@ -427,10 +427,10 @@ def search_code(query: str) -> str:
 #---------------------------AGENT INITIALIZATION------------------------ #
 
 
-def init_agent(model_name: str, system_prompt: str, reasoning: bool = False):
+def init_agent(model_name: str, system_prompt: str, reasoning: bool = False, settings: dict = None):
     """Initialize the agent with the specified model, tools, and system prompt."""
     # Be careful with your Ollama server base_url
-    model = ChatOllama(model=model_name, temperature=0.0, reasoning=reasoning, base_url=["llm"]["base_url"])
+    model = ChatOllama(model=settings["llm"]["model_name"], temperature=0.0, reasoning=settings["llm"]["reasoning"], base_url=settings["llm"]["base_url"])
     checkpointer = InMemorySaver()
 
     agent = create_agent(
@@ -457,15 +457,13 @@ def load_json_settings(file_path: str) -> dict:
 
 def main():
     settings = load_json_settings(SETTINGS_PATH)
-    formatted_system_prompt = SYSTEM_PROMPT2.format(ISSUE_NUMBER=ISSUE_NUMBER)
-    agent = init_agent(settings.get('llm', {}).get('model_name', "qwen3-coder:30b"), formatted_system_prompt, reasoning=settings.get('llm', {}).get('reasoning', False))
+    formatted_system_prompt = SYSTEM_PROMPT.format(ISSUE_NUMBER=ISSUE_NUMBER)
+    agent = init_agent(settings.get('llm', {}).get('model_name', "qwen3-coder:30b"), formatted_system_prompt, reasoning=settings.get('llm', {}).get('reasoning', False), settings=settings)
     config = {"configurable": {"thread_id": "1"}}
-    
-    #remove notes file if exists
-    if os.path.exists(NOTES_FILE):
-        os.remove(NOTES_FILE)
+
     
     rprint(f"[bold green]Starting Agent on Issue #{ISSUE_NUMBER}...[/bold green]")
+    rprint(f"[bold green]Using Model: {settings.get('llm', {}).get('model_name', 'Unknown')}[/bold green]")
 
 
     # two different user prompts for testing. Adjust as needed
@@ -578,13 +576,17 @@ def main():
         rprint(syntax)
         
         try:
-            with open(OUTPUT_FILE, "w") as f:
+            Path("./agent_outputs").mkdir(parents=True, exist_ok=True)
+            output_file = f"./agent_outputs/agent_output_issue_{ISSUE_NUMBER}.json"
+            with open(output_file, "w") as f:
                 json.dump({
+                    "issue_number": ISSUE_NUMBER,
+                    "model": settings.get('llm', {}).get('model_name', 'Unknown'),
                     "file_path": final_file_path,
                     "explanation": final_explanation,
                     "proposed_patch": code_content
                 }, f, indent=4)
-            rprint(f"\n[dim]Result saved to {OUTPUT_FILE}[/dim]")
+            rprint(f"\n[dim]Result saved to {output_file}[/dim]")
         except Exception as e:
             rprint(f"[red]Error saving file: {e}[/red]")
 

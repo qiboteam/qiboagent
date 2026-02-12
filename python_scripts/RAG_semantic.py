@@ -227,8 +227,8 @@ Context:
 {context}"""
 
     results = []
-    
-    for idx, q in enumerate(tqdm(questions, desc="Processing questions"), start=1):
+    start_index = 47
+    for idx, q in enumerate(tqdm(questions[start_index:], desc="Processing questions"), start=start_index + 1):
         try:
             response = qa_chain.invoke(q)
             answer = response.get("answer", "")
@@ -296,7 +296,7 @@ Context:
             "output": code_output
         })
 
-    Path("answers_json").mkdir(exist_ok=True)
+    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
     logger.info(f"Saved {len(results)} results to {output_file}")
@@ -527,7 +527,7 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str, save: boo
         scores.append(score)
 
     if save:
-        path = scoring_path or f"scoring_json/scoring_{model_name.replace('/', '_')}.json"
+        path = scoring_path or f"./scoring/scoring_semantic_json/scoring_{model_name.replace('/', '_')}.json"
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(scores, f, indent=2, ensure_ascii=False)
@@ -555,7 +555,7 @@ def initialize_llm(settings: dict):
     if settings["llm"]["provider"] == "ollama":
         # be careful with the base_url, it should point to your local Ollama server and the model name 
         # should match one of your Ollama models.
-        return OllamaLLM(model=settings["llm"]["model_name"], base_url=["llm"]["base_url"], temperature=0.0)
+        return OllamaLLM(model=settings["llm"]["model_name"], base_url=settings["llm"]["base_url"], temperature=0.0)
     elif settings["llm"]["provider"] == "google_genai":
         return ChatGoogleGenerativeAI(model=settings["llm"]["model_name"],
                                       google_api_key=settings["llm"]["api_key"],
@@ -574,7 +574,7 @@ def initialize_llm(settings: dict):
 #------------------------- MAIN ------------------------ #
 
 def main():
-    settings = load_json_settings("../settings_json/settings.json")
+    settings = load_json_settings("./settings_json/settings.json")
     data_dir = settings["data_dir"] if "data_dir" in settings else "./qiboKnow"
     qibo_dir = Path(data_dir) / "qibo"
     # Clone Qibo repository if not already present
@@ -596,14 +596,14 @@ def main():
         logger.info("Qibo directory already exists at %s", qibo_dir)
     persist_dir = settings["persist_dir"] if "persist_dir" in settings else "./chroma_qibo_knowledge"
     questions_file = settings.get("questions_file", "./settings_json/questions.json")
-    output_file = f"./answers/answers_json_50/answers_{settings['llm']['model_name'].replace('/', '_')}.json"
+    output_file = f"./answers/answers_semantic_json/answers_{settings['llm']['model_name'].replace('/', '_')}.json"
     golden_file = settings.get("golden_file", "./settings_json/golden_answers.json")
     rebuild = settings.get("rebuild", False)
-    scores_file = f"./scoring_json_50/scoring_{settings['llm']['model_name'].replace('/', '_')}.json"
+    scores_file = f"./scoring/scoring_semantic_json/scoring_{settings['llm']['model_name'].replace('/', '_')}.json"
 
     # Initialize embedding model based on settings configuration
     if settings["embedding_model"]["type"] == "huggingface":
-        embedding_model = HuggingFaceEmbeddings(model_name=settings["embedding_model"]["model_name"], model_kwargs={"device": "cuda"})
+        embedding_model = HuggingFaceEmbeddings(model_name=settings["embedding_model"]["model_name"], model_kwargs={"device": "cpu"})
     elif settings["embedding_model"]["type"] == "ollama":
         embedding_model = OllamaEmbeddings(model=settings["embedding_model"]["model_name"])
 

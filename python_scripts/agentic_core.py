@@ -36,10 +36,10 @@ for logger_name in ['httpx', 'httpcore', 'langchain_ollama', 'langgraph']:
 
 logger = logging.getLogger(__name__)
 
-SETTINGS_PATH = "../settings_json/settings.json"
-BASE_DIR = Path("../qibo")
+SETTINGS_PATH = "./settings_json/settings.json"
+BASE_DIR = Path("./qiboKnow/qibo")
 
-CORE_DIR = Path("../core_gen/core")
+CORE_DIR = Path("./core_gen/core")
 RUST_CORE_DIR = CORE_DIR / "qibo_core"
 BINDINGS_DIR = CORE_DIR / "qibo_python"
 
@@ -471,13 +471,13 @@ def get_python_source(base_dir: Path) -> str:
 
     return "\n\n".join(context)
 
-def init_agent(model_name: str, reasoning: bool, checkpointer=None):
+def init_agent(model_name: str, reasoning: bool, checkpointer=None, settings: dict = None):
     """Initializes the agent with the specified model and tools."""
     model = ChatOllama(
         model=model_name,
         temperature=0.0,
         reasoning=reasoning,
-        base_url=["llm"]["base_url"],
+        base_url=settings["llm"]["base_url"],
         timeout=1000.0,
         num_ctx=32768
     )
@@ -605,7 +605,7 @@ def main():
             rprint("[bold red]No Python source found[/bold red]")
             return
         
-        agent1 = init_agent(model, reasoning, checkpointer)
+        agent1 = init_agent(model, reasoning, checkpointer, settings=settings)
         config = {"configurable": {"thread_id": "1"}}
         # inject the source code into the prompt for phase 1, which is crucial for the agent to understand the logic 
         # it needs to re-implement in Rust
@@ -622,7 +622,7 @@ def main():
     # --- PHASE 2: PYTHON BINDINGS ---
     if START_FROM_PHASE <= 2:
         rprint("\n[bold yellow]--- PHASE 2: PYTHON BINDINGS ---[/bold yellow]")
-        agent2 = init_agent(model, reasoning, checkpointer)
+        agent2 = init_agent(model, reasoning, checkpointer, settings=settings)
         config = {"configurable": {"thread_id": "2"}}
         prompt_p2 = PHASE2_PROMPT
 
@@ -637,7 +637,7 @@ def main():
     # --- PHASE 3: PYTHON API WRAPPER ---
     if START_FROM_PHASE <= 3:
         rprint("\n[bold yellow]--- PHASE 3: PYTHON API WRAPPER ---[/bold yellow]")
-        agent3 = init_agent(model, reasoning, checkpointer)
+        agent3 = init_agent(model, reasoning, checkpointer, settings=settings)
         config = {"configurable": {"thread_id": "3"}}
         prompt_p3 = PHASE3_PROMPT
 
@@ -652,7 +652,7 @@ def main():
     # --- PHASE 4: REVIEW AND TEST ---
     if START_FROM_PHASE <= 4:
         rprint("\n[bold yellow]--- PHASE 4: REVIEW AND TEST ---[/bold yellow]")
-        agent4 = init_agent(model, reasoning, checkpointer)
+        agent4 = init_agent(model, reasoning, checkpointer, settings=settings)
         config = {"configurable": {"thread_id": "4"}}
         prompt_p4 = PHASE4_PROMPT
 
@@ -668,7 +668,7 @@ def main():
     if START_FROM_PHASE <= 5:
         rprint("\n[bold yellow]--- PHASE 5: DEBUGGING LOOP ---[/bold yellow]")
         
-        agent5 = init_agent(model, reasoning, checkpointer)
+        agent5 = init_agent(model, reasoning, checkpointer, settings=settings)
         config = {"configurable": {"thread_id": "5"}}
         MAX_RETRIES = 8
         
@@ -744,12 +744,12 @@ def main():
 
             rprint("[green]✓ Maturin build succeeded[/green]")
             rprint("[cyan]Running: pytest...[/cyan]")
-            test_file = "~/core_gen/core/qibo_python/tests/test_bindings.py"
+            test_file = "tests/test_bindings.py"
 
             success, output = run_command_check(
-                f"PYTHONPATH=. {sys.executable} -m pytest {test_file} -v",
+                f"{sys.executable} -m pytest {test_file} -v",
                 "qibo_python"
-            )     
+            )
             if not success:
                 rprint(Panel(
                     output[:2000] + "..." if len(output) > 2000 else output,

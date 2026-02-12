@@ -202,8 +202,10 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str):
         scores.append(score)
 
     # Save scores to file
-    Path("scoring_noRAG_json").mkdir(exist_ok=True)
-    output_file = f"scoring/scoring_noRAG_json/scoring_{model_name.replace('/', '_')}.json"
+    output_dir = Path("./scoring/scoring_noRAG_json")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / f"scoring_{model_name.replace('/', '_')}.json"
+
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(scores, f, indent=2, ensure_ascii=False)
     
@@ -214,7 +216,7 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str):
 def initialize_llm(settings: dict):
     """Initialize LLM based on settings configuration."""
     if settings["llm"]["provider"] == "ollama":
-        return OllamaLLM(model=settings["llm"]["model_name"], base_url=["llm"]["base_url"], temperature=0.0)
+        return OllamaLLM(model=settings["llm"]["model_name"], base_url=settings["llm"]["base_url"], temperature=0.0)
     elif settings["llm"]["provider"] == "google_genai":
         return ChatGoogleGenerativeAI(model=settings["llm"]["model_name"],
                                       google_api_key=settings["llm"]["api_key"],
@@ -228,7 +230,8 @@ def LLM_answer_questions(llm, questions: List[str]) -> List[dict]:
     results = []
     chain = prompt | llm | StrOutputParser()
     
-    for question in tqdm(questions, desc="Getting LLM answers", ncols=80):
+    start_index = 48
+    for idx, question in enumerate(tqdm(questions[start_index:], desc="Getting LLM answers", ncols=80), start=start_index):
         try:
             #logger.info("waiting 10 mins to avoid rate limits...")
             #time.sleep(600)
@@ -250,7 +253,7 @@ def LLM_answer_questions(llm, questions: List[str]) -> List[dict]:
 
 def main():
     # Load settings
-    settings_file = "../settings_json/settings.json"
+    settings_file = "./settings_json/settings.json"
     if not Path(settings_file).exists():
         logger.error(f"Settings file not found: {settings_file}")
         sys.exit(1)
@@ -258,8 +261,8 @@ def main():
     with open(settings_file, "r", encoding="utf-8") as f:
         settings = json.load(f)
 
-    questions_file = "../settings_json/questions_2.json"
-    golden_file = "../settings_json/golden_answers_2.json"
+    questions_file = settings.get("questions_file", "./settings_json/questions.json")
+    golden_file = settings.get("golden_file", "./settings_json/golden_answers.json")
 
     logger.info(f"Using LLM model: {settings['llm']['model_name']}")
 
@@ -270,8 +273,6 @@ def main():
 
     with open(golden_file, "r", encoding="utf-8") as f:
         golden_answers = json.load(f)
-
-    print(f"no RAG run with {settings['llm']['model_name']}")
 
     results = LLM_answer_questions(llm, questions)
 

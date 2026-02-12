@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
 import re
+import subprocess
 import nbformat
 import os
 import ast
@@ -117,7 +118,6 @@ def build_vectorstore(chunks: List[Document], embedding_model, persist_directory
 
 
 def _extract_class_header(source: str, class_node: ast.ClassDef) -> str:
-
     class_lines = []
     class_source = ast.get_source_segment(source, class_node)
     if not class_source: return ""
@@ -568,39 +568,56 @@ def write_docstrings_to_file(docstrings: List[Dict[str, str]], output_file: str)
 
 def main():
     try:
-        settings = load_json_settings("../settings_json/settings.json")
+        settings = load_json_settings("./settings_json/settings.json")
     except Exception as e:
         logger.error(f"Failed to load settings: {e}")
         return
 
-    script_dir = Path(__file__).parent.resolve()   
-    base_dir = script_dir.parent                   
+    script_dir = Path(__file__).parent 
+    project_root = script_dir.parent # qibollm/
+
+    qibo_repo = project_root / "qiboKnow" / "qibo"
+    
+    # Clone Qibo repository if it doesn't exist
+    if not qibo_repo.exists():
+        logger.info(f"Cloning Qibo repository to {qibo_repo}...")
+        qibo_repo.mkdir(parents=True, exist_ok=True)
+        try:
+            subprocess.run(
+                ["git", "clone", "https://github.com/qiboteam/qibo.git", str(qibo_repo)],
+                check=True,
+                capture_output=True
+            )
+            logger.info("Qibo repository cloned successfully")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to clone Qibo repository: {e}")
+            return              
     
     # Get docstring involved the file path 
     # Set in settings.json the file path of the Python file you want to generate docstrings for.
-    raw_py_path = settings.get("py_file_path", "../docstrings/result_visualization.py")
-    if raw_py_path.startswith("../"):
-        clean_path = raw_py_path.replace("../", "", 1)
-        py_file_path = base_dir / clean_path
-    else:
-        py_file_path = Path(raw_py_path).resolve()
-
-    if not py_file_path.exists():
-        logger.error(f"File does not exist: {py_file_path}")
+    py_file_name = settings.get("py_file_docstring", "result_visualization.py")
+    py_file = project_root / "docstrings" / py_file_name
+    if not py_file.exists():
+        logger.error(f"File to be documented does not exist: {py_file}")
         return
 
-    output_dir = base_dir / "docs"
+    output_dir = py_file.parent
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    py_file_name = py_file_path.stem
+    py_file_name = py_file.stem
     model_name = settings['llm']['model_name'].replace(":", "-") 
+
+    # output paths
     output_file = output_dir / f"{py_file_name}_{model_name}.json"
     py_output_file = output_dir / f"{py_file_name}_{model_name}.py"
-    data_dir = settings.get("data_dir", str(base_dir / "qiboKnow"))
-    persist_dir = settings.get("persist_dir", str(base_dir / "chroma_qibo_docs"))
+
+    data_dir = str(qibo_repo)
+    persist_dir = str(project_root / "qiboKnow" /"chroma_qibo_docs")
     
-    logger.info(f"Input file: {py_file_path}")
-    logger.info(f"Output dir: {output_dir}")  
+    logger.info(f"Knowledge base: {data_dir}")
+    logger.info(f"Target file: {py_file}")
+    logger.info(f"Output directory: {output_dir}")
+
     rebuild = settings.get("rebuild", False)
 
     logger.info("Initializing Embeddings...")
@@ -616,7 +633,7 @@ def main():
 
     logger.info("Parsing code and documentation...")
     # exclude the target file in order to avoid data contamination
-    code_items = parse_repo(data_dir, exclude_file=str(py_file_path))
+    code_items = parse_repo(data_dir, exclude_file=str(py_file))
     code_chunks = create_code_chunks(code_items)
     doc_chunks = create_doc_chunks(data_dir)
     
@@ -637,7 +654,7 @@ def main():
     llm = initialize_llm(settings)
     chain = create_generation_chain(llm)
 
-    functions_dict = parse_target_file(str(py_file_path))
+    functions_dict = parse_target_file(str(py_file))
     docstring_results = []
 
     # Generate the docstrings for each function and class in file
@@ -654,6 +671,9 @@ def main():
         json.dump(docstring_results, f, indent=4)
     
     write_docstrings_to_file(docstring_results, output_file=str(py_output_file))
+
+    logger.info(f"Docstrings saved to {output_file}")
+    logger.info(f"Python file with docstrings saved to {py_output_file}")
 
 if __name__ == "__main__":
     main()

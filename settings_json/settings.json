@@ -1,29 +1,29 @@
 {
-  "data_dir": "./qiboKnow",                                    // Knowledge-Base Directory 
-  "persist_dir": "./chroma_qiboKnow",                          // ChromaDB Persistence Directory (vector-store directory)
-  "rebuild": false,                                            // Rebuild the vector store from the knowledge base 
+  "data_dir": "./qiboKnow",                                    
+  "persist_dir": "./chroma_qiboKnow",                          
+  "rebuild": true,                                            
   "embedding_model": { 
-    "type": "huggingface",                                     // Embedding model type: "huggingface" or "Ollama"
-    "model_name": "sentence-transformers/all-MiniLM-L6-v2"     // Embedding model name
+    "type": "huggingface",                                     
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2"     
   },
   "llm": {
-    "provider": "ollama",                                      // LLM provider
-    "model_name": "gpt-oss:20b",                               // LLM model name 
-    "base_url": "http://localhost:11434/api",                  // Base URL for the OLLAMA API (only for local models like Ollama)
-    "api_key": "your api_key",                                 // LLM API key for propietary models
-    "reasoning": false                                         // enable model reasoning
+    "provider": "ollama",                                      
+    "model_name": "llama3.2:1b",                               
+    "base_url": "http://localhost:11434",                  
+    "api_key": "your api_key",                                 
+    "reasoning": false                                         
   },
-  "workflow": {                                                // Agentic Qibo-core workflow settings
-    "start_from_phase": 1,                                     // Starting phase (example: with 2 you will start from the second agent)       
-    "skip_cleanup": true                                       // Clean the generated code files when restart
+  "workflow": {                                                
+    "start_from_phase": 5,                                     
+    "skip_cleanup": true                                       
   },
   "retriever": { 
-    "search_type": "mmr",                                      // Retrieval strategy parameters
-    "search_k": 6,                                             // see https://reference.langchain.com/python/langchain_core/vectorstores/#langchain_core.vectorstores.base.VectorStore.as_retriever
+    "search_type": "mmr",                                      
+    "search_k": 6,                                             
     "fetch_k": 24,
     "mmr_lambda": 0.5
   },
-  "questions_file": "./settings_json/questions_2.json",        // File containing the questions about Qibo to be answered by the LLM
-  "golden_file": "./settings_json/golden_answers_2.json",      // File containing the golden answers to the questions for evaluation
-  "py_file_path" : "docs/result_visualization.py"              // files for which docstrings are to be generated
+  "questions_file": "./settings_json/questions_2.json",        
+  "golden_file": "./settings_json/golden_answers_2.json",      
+  "py_file_docstring" : "result_visualization.py"              
 }

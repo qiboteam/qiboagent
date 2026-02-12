@@ -16,9 +16,16 @@ poetry install
 To run local model you also have to install [Ollama](https://ollama.com/) and pull the model you want to use.
 If you use an Ollama server be careful to set the correct base url in settings.
 
+
 ## Scripts
 
 in ```python_script/``` there are all the necessary script to reproduce the RAG and agentic pipelines.
+
+to run the scripts simply run 
+
+```bash
+poetry run python python_scripts/script_name.py
+```
 
 ### Quantum Computing Q&A
 

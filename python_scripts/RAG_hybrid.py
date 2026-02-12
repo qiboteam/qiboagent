@@ -53,7 +53,7 @@ def initialize_llm(settings: dict):
     """Initialize LLM based on settings configuration."""
     if settings["llm"]["provider"] == "ollama":
         # Be careful with your Ollama server base_url
-        return OllamaLLM(model=settings["llm"]["model_name"], base_url=["llm"]["base_url"], temperature=0.0)
+        return OllamaLLM(model=settings["llm"]["model_name"], base_url=settings["llm"]["base_url"], temperature=0.0)
     elif settings["llm"]["provider"] == "google_genai":
         return ChatGoogleGenerativeAI(model=settings["llm"]["model_name"], temperature=0.0, google_api_key=settings["llm"]["api_key"])
     else:
@@ -485,9 +485,8 @@ RAG CONTEXT:\n
 
     results = []
     
-    start_from = 42
+    start_from = 48
     for idx, q in enumerate(tqdm(questions[start_from-1:], desc="Processing questions"), start=start_from):
-        time.sleep(120)
         try:
             response = qa_chain.invoke(q)
             answer = response.get("answer", "")
@@ -555,7 +554,7 @@ RAG CONTEXT:\n
             "output": code_output
         })
 
-    Path("answers_json").mkdir(exist_ok=True)
+    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
     logger.info(f"Saved {len(results)} results to {output_file}")
@@ -786,7 +785,7 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str, save: boo
         scores.append(score)
 
     if save:
-        path = scoring_path or f"scoring_json/scoring_{model_name.replace('/', '_')}.json"
+        path = scoring_path or f"./scoring/scoring_hybrid_json/scoring_{model_name.replace('/', '_')}.json"
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(scores, f, indent=2, ensure_ascii=False)
@@ -810,7 +809,7 @@ def extract_code(answer: str) -> str:
 # ------------------------ MAIN ------------------------ #
 
 def main():
-    settings = load_json_settings("../settings_json/settings.json")
+    settings = load_json_settings("./settings_json/settings.json")
     data_dir = settings.get("data_dir", "./qiboKnow")
     qibo_dir = Path(data_dir) / "qibo"
     # Clone Qibo repository if not already present
@@ -818,9 +817,9 @@ def main():
         logger.info("Cloning Qibo repository...")
         subprocess.run(["git","clone","https://github.com/qiboteam/qibo.git",str(qibo_dir)], check=True)
     persist_dir = settings.get("persist_dir", "./kb_chroma")
-    questions_file = settings.get("questions_file", "../settings_json/questions_2.json")
-    output_file = f"../answers/answers_newrag/answers_{settings['llm']['model_name'].replace('/', '_')}.json"
-    golden_file = settings.get("golden_file", "../settings_json/golden_answers_2.json")
+    questions_file = settings.get("questions_file", "./settings_json/questions_2.json")
+    output_file = f"./answers/answers_hybrid_json/answers_{settings['llm']['model_name'].replace('/', '_')}.json"
+    golden_file = settings.get("golden_file", "./settings_json/golden_answers_2.json")
     rebuild = settings.get("rebuild", False)
 
     # LLM
@@ -854,7 +853,7 @@ def main():
     # --- Auto-scoring ---
     with open(golden_file,"r",encoding="utf-8") as f:
         golden_answers = json.load(f)
-    scores_file = f"./scoring_newrag/scoring_{settings['llm']['model_name'].replace('/', '_')}.json"
+    scores_file = f"./scoring/scoring_hybrid_json/scoring_{settings['llm']['model_name'].replace('/', '_')}.json"
     scores = auto_scoring(results, golden_answers, settings['llm']['model_name'], save=True, scoring_path=scores_file)
 
     total_questions = len(scores)
