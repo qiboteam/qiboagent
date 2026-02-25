@@ -1,33 +1,45 @@
-# Use a lightweight Python base image
-FROM python:3.12-slim
+# Start with Ollama as the base
+FROM ollama/ollama:latest
 
-# Set environment variables to configure Poetry and Python
+# 1. Install Python and venv (essential for modern Debian)
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     POETRY_VERSION=2.3.2 \
-    POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_NO_INTERACTION=1 \
-    POETRY_NO_ANSI=1
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    POETRY_NO_INTERACTION=1
 
-# Set the working directory
 WORKDIR /app
 
-# Install Poetry
-RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
+# 2. Install Poetry using the official method to avoid "externally managed" errors
+RUN python3 -m venv /opt/poetry-venv && \
+    /opt/poetry-venv/bin/pip install poetry==$POETRY_VERSION
 
-# Copy the dependency files first to leverage Docker's layer caching
-# The asterisk on poetry.lock* ensures the build doesn't fail if you haven't generated a lockfile yet
+# Add Poetry to PATH
+ENV PATH="/opt/poetry-venv/bin:$PATH"
+
+# 3. Copy dependencies and install
+# We let Poetry create its own virtual env in /app/.venv
 COPY pyproject.toml poetry.lock* ./
-
-# Install dependencies
-# --only main prevents installing development dependencies (like pytest) in the production image
-# --no-root skips installing the project itself as a package (standard for simple Streamlit apps)
 RUN poetry install --only main --no-root
 
-# Copy the rest of your application code
+# 4. Copy your app code
 COPY . .
 
-# Expose Streamlit's default port
-EXPOSE 8501
+# 5. Create the startup script
+# Note: We must run 'poetry run' so it uses the virtual environment we just created
+RUN echo '#!/bin/bash\n\
+ollama serve &\n\
+sleep 5\n\
+poetry run streamlit run ui/Home.py --server.port=8501 --server.address=0.0.0.0\n\
+' > /app/start.sh && chmod +x /app/start.sh
 
-# Run the Streamlit app
-CMD ["streamlit", "run", "ui/Home.py", "--server.port=8501", "--server.address=0.0.0.0"]
+EXPOSE 8501
+EXPOSE 11434
+
+ENTRYPOINT ["/bin/bash", "/app/start.sh"]
