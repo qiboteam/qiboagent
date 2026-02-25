@@ -1,0 +1,352 @@
+{   
+    "How do I set numpy as the backend in the Qibo library?" : {
+        "expected_output" : "Using numpy backend on",
+        "expected_sources" : ["qiboKnow/qibo/doc/source/api-reference/qibo.rst",
+                              "qiboKnow/qibo/doc/source/getting-started/installation.rst",
+                               "qiboKnow/qibo/src/qibo/backends/init.py"]
+    },
+
+    "I want to use numpy as the backend in Qibo, how can I do that? provide a code example.": {
+        "expected_output" : "Using numpy backend on",
+        "expected_sources" : []
+    },
+
+    "Using qibo write a code example of a quantum circuit with two qbits, with an Hadamard gate for each, execute the circuit and print the result state." : {
+        "expected_output" : ["(0.5+0j)|00> + (0.5+0j)|01> + (0.5+0j)|10> + (0.5+0j)|11>", "[0.49999997+0.j 0.49999997+0.j 0.49999997+0.j 0.49999997+0.j]", "(0.25+0j)|00><00| + (0.25+0j)|00><01| + (0.25+0j)|00><10| + (0.25+0j)|00><11| + (0.25+0j)|01><00| + (0.25+0j)|01><01| + (0.25+0j)|01><10| + (0.25+0j)|01><11| + (0.25+0j)|10><00| + (0.25+0j)|10><01| + (0.25+0j)|10><10| + (0.25+0j)|10><11| + (0.25+0j)|11><00| + (0.25+0j)|11><01| + (0.25+0j)|11><10| + (0.25+0j)|11><11|", "[0.5+0.j 0.5+0.j 0.5+0.j 0.5+0.j]"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/result.py"]
+    },
+
+    "Using qibo write a code for a two qbit quantum circuit with X gate on the first qbit and Z gate on the second one, execute the circuit and print the final state" : {
+        "expected_output" : ["(1+0j)|10>", "[0.+0.j 0.+0.j 1.+0.j 0.+0.j]"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "Generate Python code using the Qibo library. Create a 2-qubit circuit. Construct a Bell state using an H gate on qubit 0 and a CNOT gate (control 0, target 1). Add a measurement register (M) on both qubits. Execute the circuit with 1 shot. Finally, print the resulting measurement frequencies." : {
+        "expected_output" : ["Counter({'00': 1})", "Counter({'11': 1})", "Counter({3: 1})", "Counter({0: 1})"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/src/qibo/result.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "How do i set numpy backend and complex64 as simulation data type in qibo library?" : {
+        "expected_output" : "Using numpy backend on",
+        "expected_sources" : ["qiboKnow/qibo/doc/source/getting-started/installation.rst",
+                               "qiboKnow/qibo/src/qibo/backends/init.py",
+                               "qiboKnow/qibo/src/qibo/backends/numpy.py",
+                               "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "Tell me how to set numpy as backend in qibo library and how to set the number of threads to 1, write the code that prints the number of threads." : {
+        "expected_output" : ["Using numpy backend on", "1"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/getting-started/installation.rst",
+                               "qiboKnow/qibo/src/qibo/backends/init.py",
+                               "qiboKnow/qibo/src/qibo/backends/numpy.py",
+                               "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "Using qibo create a quantum circuit with three qbits, with wire names A, B and C, finally draw the circuit." : {
+        "expected_output" : ["A: ─────\nB: ─────\nC: ─────"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/examples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py"]
+    },
+
+    "Using qibo create a quantum fourier transform circuit of 3 qbits, then create another three qbits circuit with a hadamard gate on each qbit, add the two circuits together and draw the resulting circuit." : {
+        "expected_output" : ["0: ─H─U1─U1────────x─H─\n1: ───o──|──H─U1───|─H─\n2: ──────o────o──H─x─H─"],
+        "expected_sources " : []
+    },
+
+    "Using qibo, write a code example where you create a one qbit circuit, add a RX gate, the a RY gate and finally a RZ gate, initially put all gates parameters to zero and then set all the parameters to np.pi, execute the circuit and print the resulting state." : {
+        "expected_output" : ["(1+0j)|0>", "[1.+0.j 0.+0.j]", "[1.000000e+00+6.123234e-17j 6.123234e-17+6.123234e-17j]"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "Using qibo i want to know if the RX gate is a clifford gate, write a code example where you print \"is clifford\" if this gate is actually clifford." : {
+        "expected_output" : ["is clifford"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "Using qibo library create a three qubit quantum circuit that creates a GHZ state, execute the circuit and print the resulting state." : {
+        "expected_output" : ["(0.70711+0j)|000> + (0.70711+0j)|111>", "[0.70710678+0.j 0.        +0.j 0.        +0.j 0.        +0.j\n 0.        +0.j 0.        +0.j 0.        +0.j 0.70710678+0.j]"],
+        "expected_sources" : []
+    },
+
+    "How do i create the encoding circuit starting from a bit string? write a code example where you create a circuit with 4 qbits and encode the bit string '1010', execute the circuit and print the resulting state." : {
+        "expected_output" : ["(1+0j)|1010>", "[0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j\n 1.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j]", "[0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 1.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j]"],
+        "expected_sources" : []
+    },
+
+    "Using qibo, write a code example where you create a one qbit circuit, add a RX gate, the a RY gate and finally a RZ gate, initially put all gates parameters to zero and then set all the parameters to pi/2, execute the circuit and print the resulting state." : {
+        "expected_output" : ["(0.70711-0j)|0> + (0.70711-0j)|1>", "[0.70710678-7.85046229e-17j 0.70710678-5.55111512e-17j]"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "How to collapse a measure a qbit in qibo library?, write a code example where you create a circuit with one qbit, add a hadamard gate and then measure the qbit, execute the circuit with 100 shots and print the resulting measurement object." : {
+        "expected_output" : ["|0><0|", "|1><1|", "0.  +0.j]", "[0.  +0.j"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/src/qibo/result.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "How do i know the openQASM label of a gate in qibo library?, write a code example where you create a circuit with one qbit, add a CRY gate with angle pi/2 and print the openQASM label of this gate." : {
+        "expected_output" : "cry",
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/gates/gates.py"]
+    },
+
+    "Using the Qibo library, generate a Python script that creates a 4-qubit quantum circuit. The circuit must apply a Hadamard (H) gate to qubits 0 and 1, followed by a Control-Z (CZ) gate between qubits 0 and 2, and another CZ gate between qubits 1 and 3. Finally, print the circuit summary." : {
+        "expected_output" : ["Circuit depth = 2\nTotal number of gates = 4\nNumber of qubits = 4\nMost common gates:\nh: 2\ncz: 2"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/examples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py"]
+    },
+
+    "Using qibo create a quantum circuit with two qbits, add an hadamard gate for each and a X gate on the second. invert the circuit and draw the original circuit and the inverted one." : {
+        "expected_output" : ["0: ─H───", "1: ─H─X─", "0: ─H───", "1: ─X─H─"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/advanced_examples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py"]
+    },
+    
+    "Write Python code to implement a Quantum Fourier Transform (QFT) on 5 qubits using the Qibo library, and then provide the code to visualize (use draw()) the corresponding circuit." : {
+        "expected_output" : ["0: ─H─U1─U1─U1─U1───────────────────────────x───\n1: ───o──|──|──|──H─U1─U1─U1────────────────|─x─\n2: ──────o──|──|────o──|──|──H─U1─U1────────|─|─\n3: ─────────o──|───────o──|────o──|──H─U1───|─x─\n4: ────────────o──────────o───────o────o──H─x───", ""],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/examples.rst",
+                              "qiboKnow/qibo/README.md",
+                              "qiboKnow/qibo/src/qibo/models/qft.py",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py"]    
+    },
+
+    "Using Qibo python library print the eigenvalues of the XXX hamiltonian with 2 qbits" : {
+        "expected_output" : ["[-3. -2. -1.  6.]"],
+        "expected_sources" : []
+    },
+
+    "Using Qibo library, print the eigenvalues and the ground state of the Transverse field Ising model Hamiltonian (TFIM) with 4 qbits (put h parameter at 0), use the built in methods." : {
+    "expected_output" : ["[-4. -4. -0. -0. -0. -0. -0. -0. -0. -0. -0. -0. -0. -0.  4.  4.]", "[1.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j]"],
+    "expected_sources" : ["qiboKnow/qibo/src/qibo/hamiltonians/abstract.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/hamiltonians.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/models.py"]    
+    },
+
+    "Using Qibo, write a python code that prints the eigenvectors of the Non-Interacting Pauli X Hamiltonian with 3 qbits, use the built in methods." : {
+        "expected_output" : ["[[ 0.35355339+0.j  0.04805439+0.j -0.61041051+0.j -0.00947559+0.j  0.        +0.j -0.57955505+0.j  0.19777751+0.j -0.35355339+0.j]\n [ 0.35355339+0.j  0.40757065+0.j -0.17922089+0.j  0.42043554+0.j  0.40824829+0.j  0.32503669+0.j  0.3204442 +0.j  0.35355339+0.j]\n [ 0.35355339+0.j -0.5451011 +0.j -0.24962891+0.j  0.12470043+0.j  0.14942925+0.j  0.01307228+0.j -0.59371712+0.j  0.35355339+0.j]\n [ 0.35355339+0.j -0.18558484+0.j  0.18156071+0.j  0.55461155+0.j -0.55767754+0.j  0.24144608+0.j  0.07549541+0.j -0.35355339+0.j]\n [ 0.35355339+0.j  0.18558484+0.j -0.18156071+0.j -0.55461155+0.j -0.55767754+0.j  0.24144608+0.j  0.07549541+0.j  0.35355339+0.j]\n [ 0.35355339+0.j  0.5451011 +0.j  0.24962891+0.j -0.12470043+0.j  0.14942925+0.j  0.01307228+0.j -0.59371712+0.j -0.35355339+0.j]\n [ 0.35355339+0.j -0.40757065+0.j  0.17922089+0.j -0.42043554+0.j  0.40824829+0.j  0.32503669+0.j  0.3204442 +0.j -0.35355339+0.j]\n [ 0.35355339+0.j -0.04805439+0.j  0.61041051+0.j  0.00947559+0.j  0.        +0.j -0.57955505+0.j  0.19777751+0.j  0.35355339+0.j]]", "[["],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/hamiltonians/hamiltonians.py", 
+                              "qiboKnow/qibo/src/qibo/hamiltonians/models.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/abstract.py"]    
+    },
+
+    "Write a Python script using the qibo library. Define a function named bool_commute that accepts two gate objects and returns True if the gates commute, and False otherwise. Create two Hadamard gates, both acting on qubit 0. Print the result of calling your bool_commute function with these two gates.": {
+        "expected_output" : "True",
+        "expected_sources" : []
+    },
+
+    "Build a two-qubit variational quantum eigensolver using an XXZ Hamiltonian and a single RY rotation on the first qubit as the ansatz, initialize the parameter randomly between 0 and 2, run the minimization, and print the element at index 2 of the tuple returned by the minimization.": {
+        "expected_output" : ["Optimization terminated successfully"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/models/variational.py",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "Create and run a Quantum Approximate Optimization Algorithm using the TFIM Hamiltonian on six qubits, store the minimization results in a variable named result, and print it to the screen.": {
+        "expected_output" : ["Optimization terminated successfully"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/models/variational.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/hamiltonians.py",
+                              "qiboKnow/qibo/doc/source/code-examples/advanced_examples.rst"]
+    },
+
+
+    "Using the Qibo library, create a three-site Heisenberg Hamiltonian with all coupling constants set to 1.0 and all external magnetic field strengths set to 0.0. Define an initial state vector `[1/3, 0, 0, 0, 1/3, 0, 0, 1/3]`. Compute the expectation value of the Hamiltonian for this state and print the result." : {
+        "expected_output" : ["-0.5555555555555556"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/hamiltonians/models.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/hamiltonians.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/abstract.py"]
+    },
+
+    "Using the Qibo library, define a symbolic Hamiltonian for a two-qubit system using single-qubit operators like I, X, Y, Z and their combinations. Construct the Hamiltonian symbolically and compute its eigenvalues, then print the result." : {
+        "expected_output" : ["Calculating the dense form of a symbolic Hamiltonian"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/symbols.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/hamiltonians.py",
+                              "qiboKnow/qibo/src/doc/source/code-examples/advancedexamples.rst"]
+    },
+
+    "Provide a complete Python code, using the Qibo library, to create a 2-qubit quantum circuit. The circuit should apply an X gate to qubit 0, followed by a measurement gate on both qubits. Finally, execute the circuit with 100 shots and print the entire resulting measurement object." : {
+        "expected_output" : ["(1+0j)|10>", "[0.+0.j 0.+0.j 1.+0.j 0.+0.j]"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst"]    
+    },
+
+    "Write Python code using Qibo package to create a 3-qubit quantum circuit.  Add the following gates in order: RX on qubit 0, RY on qubit 1, CZ between qubits 1 and 2, fSim between qubits 0 and 2, and H on qubit 2, initialize all gate parameters to zero. Finally, set the circuit parameters with the values [0.123, 0.456, (0.789, 0.321)] respectively. Execute the circuit and print the final state." : {
+        "expected_output" : ["(0.65746+0j)|000> + (0.71755+0j)|001> + (0.15255+0j)|010> + (0.1665+0j)|011> + -0.02983j|100> + -0.02983j|101> + -0.00692j|110> + -0.00692j|111>", "[0.65746198+0.j         0.71754788+0.j         0.15255399+0.j\n 0.16649601+0.j         0.        -0.02982731j 0.        -0.02982731j\n 0.        -0.00692097j 0.        -0.00692097j]"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/advancedexamples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py"]
+    },
+
+    "Write a complete Python code using Qibo that prepares a qubit in the $|+\rangle$ state and evolve it for a given time $t=1$ under the Hamiltonian $H=X$. The final code should print the state vector of the evolved qubit." : {
+        "expected_output" : ["[0.38205142+0.59500984j 0.38205142+0.59500984j]"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/advancedexamples.rst",
+                              "qiboKnow/qibo/src/qibo/models/evolution.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/models.py"]
+    },
+
+    "Build a four-qubit quantum circuit that applies Hadamard gates to all qubits, then applies CNOT gates between qubits (0,1), (1,3), and (2,3), define a MaxCut Hamiltonian on four qubits, execute the circuit, compute the expectation value of the Hamiltonian with respect to the circuit's output state, and print it." : {
+        "expected_output" : ["-5.999999"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/advancedexamples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/models/models.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/hamiltonians.py"]
+    },
+
+    "Write a Python script using the Qibo library that builds a 2-qubit quantum circuit with noise. Create a `NoiseModel` and add a Pauli Z error with probability 0.2 to the Hadamard gate on qubit 1, and a Pauli Y error with probability 0.1 to the CNOT gate. Then create a 2-qubit circuit in density matrix mode, add two Hadamard gates (one on each qubit) and a CNOT gate from qubit 0 to qubit 1. Apply the noise model to the circuit, execute it for 100 shots, and print the result." : {
+        "expected_output" : ["(0.25+0j)|00><00| + (0.12+0j)|00><01| + (0.12+0j)|00><10| + (0.16+0j)|00><11| + (0.12+0j)|01><00| + (0.25+0j)|01><01| + (0.16+0j)|01><10| + (0.12+0j)|01><11| + (0.12+0j)|10><00| + (0.16+0j)|10><01| + (0.25+0j)|10><10| + (0.12+0j)|10><11| + (0.16+0j)|11><00| + (0.12+0j)|11><01| + (0.12+0j)|11><10| + (0.25+0j)|11><11|", "[[0.25+0.j 0.12+0.j 0.12+0.j 0.16+0.j]\n[0.12+0.j 0.25+0.j 0.16+0.j 0.12+0.j]\n[0.12+0.j 0.16+0.j 0.25+0.j 0.12+0.j]\n[0.16+0.j 0.12+0.j 0.12+0.j 0.25+0.j]]"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/api-reference/qibo.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/noise.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py"]
+    },
+
+    "Use a Hadamard gate to create a superposition. Starting from the $\\mid 0\\rangle$ state with one qbit, write a complete Python code using Qibo library to apply the H gate on the qbit. Print the resulting state from the circuit." : {
+        "expected_output" : ["[0.70710678+0.j 0.70710678+0.j]", "(0.70711+0j)|0> + (0.70711+0j)|1>", "(0.5+0j)|0><0| + (0.5+0j)|0><1| + (0.5+0j)|1><0| + (0.5+0j)|1><1|", "[[0.5+0.j 0.5+0.j] [0.5+0.j 0.5+0.j]]"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/gates/gates.py", 
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/ui/result_visualization.py"]
+    },
+
+    "Using the Qibo library, create a two-qubit quantum circuit that applies a Hadamard gate on the first qubit followed by a CNOT gate. Insert a CallbackGate that computes the entanglement entropy at the end of the circuit execution, and after running the circuit, print the values recorded by the callback." : {
+        "expected_output" : ["(1.0)", "[np.float64(3.2034265038149176e-16)]"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/advancedexamples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/callbacks.py",
+                              "qiboKnow/qibo/src/qibo/gates/special.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py"]
+    },
+
+
+  "Using the Qibo library, build a two-qubit quantum circuit that applies a Hadamard gate on the first qubit followed by a CNOT gate. Define a target quantum state as a NumPy array with the explicit values `[0.70710678+0.j, 0.0+0.j, 0.0+0.j, 0.70710678+0.j]`, corresponding to the Bell state (|00⟩ + |11⟩) / √2. Create an `Overlap` callback initialized with this state, add it to the circuit using a `CallbackGate`, execute the circuit, and finally print the overlap values recorded during execution." : {
+        "expected_output" : ["0.99"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/advancedexamples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/callbacks.py",
+                              "qiboKnow/qibo/src/qibo/gates/special.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py"]
+    },
+
+    "Using the Qibo library, create a two-qubit quantum circuit that prepares a Bell state. Apply a Hadamard gate on the first qubit followed by a CNOT gate with the second qubit as the target. Execute the circuit with `density_matrix=True` to obtain the final quantum state, and then compute and print the entanglement entropy of the first qubit using the built in methods." : {
+        "expected_output" : ["1.0"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/api-reference/qibo.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/src/qibo/quantum_info/entanglement.py"]
+    },
+
+
+    "Using the Qibo library, write a Python function called `create_bell_state` that builds a 2-qubit quantum circuit to generate the Bell state \\(|\\Phi^+\\rangle = (|00\\rangle + |11\\rangle)/\\sqrt{2}\\). The circuit should apply a Hadamard gate on the first qubit, followed by a CNOT gate with the second qubit as the target. At the end of the program, print the final quantum state." : {
+        "expected_output" : ["(0.70711+0j)|00> + (0.70711+0j)|11>", "[0.70710678+0.j 0.        +0.j 0.        +0.j 0.70710678+0.j]"],
+        "expected_sources" : ["qiboKnow/qibo/examples/bell-variational/functions.py",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/doc/source/code-examples/examples.rst"]
+    },
+
+    "Using the qibo library, write Python code that performs an adiabatic evolution of an Hamiltonian with 4 qubits. Use the Pauli-X Hamiltonian as the initial Hamiltonian and the Heisenberg XXZ Hamiltonian as the problem Hamiltonian. Set the total evolution time to 1, a linear interpolation schedule, and time step dt=1e-2. Print the final quantum state after the evolution." : {
+        "expected_output" : ["[-0.20270913-0.24746866j -0.2469156 -0.00439931j -0.2469156 -0.00439931j\n -0.19573125+0.0893863j  -0.2469156 -0.00439931j -0.24616577+0.02286377j\n -0.19573125+0.0893863j  -0.2469156 -0.00439931j -0.2469156 -0.00439931j\n -0.19573125+0.0893863j  -0.24616577+0.02286377j -0.2469156 -0.00439931j\n -0.19573125+0.0893863j  -0.2469156 -0.00439931j -0.2469156 -0.00439931j\n -0.20270913-0.24746866j]"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/advancedexamples.rst",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/adiabatic.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/models.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/hamiltonians.py",
+                              "qiboKnow/qibo/src/qibo/models/evolution.py"]
+    },
+
+    "Generate a complete Python code using the qibo library to simulate the application of a Kraus Channel on a single qubit, operating in density matrix mode.\\n\\nThe code must be structured around a function called `simulate_kraus_channel(lamda: float) that accepts the scalar parameter $\\lambda$ as its argument.\\n\\nThe function must:\\n1.  Internally define or globally access the Identity matrix $I$ and Pauli matrices $X, Y, Z$ as $2\\times2$ complex NumPy arrays.\\n2.  Calculate the Kraus operators $K_0, K_1, K_2, K_3$ using $\\lambda$ and the following formulas:\\n    $$K_{0}={\\sqrt {1-{\\frac {3\\lambda }{4}}}}I$$   $$K_{1}={\\sqrt {\\frac {\\lambda }{4}}}X$$   $$K_{2}={\\sqrt {\\frac {\\lambda }{4}}}Y$$   $$K_{3}={\\sqrt {\\frac {\\lambda }{4}}}Z$$\\n3.  Create a `KrausChannel` with these operators on qubit 0.\\n4.  Construct a 1-qubit `Circuit` in `density_matrix=True` mode.\\n5.  Add the channel to the circuit and execute the simulation.\\n6.  Return the final density matrix.\\n\\nAfter defining the function, invoke it with $\\lambda = 0.4$ to create and simulate the circuit, and print the final result." : {
+        "expected_output" : ["(0.8+0j)|0><0| + (0.2+0j)|1><1|", "[[0.8+0.j 0. +0.j]\n [0. +0.j 0.2+0.j]]"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/advancedexamples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/channels.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py"]
+    },
+
+    "Using the Qibo library, write a Python function that implements Deutsch's algorithm for a balanced function. The function should prepare two qubits (the first in state |0⟩ and the second in state |1⟩), apply Hadamard gates to both qubits, implement the oracle for a balanced function (f(x) = x as a CNOT with the first qubit as control and the second as target), apply another Hadamard gate to the first qubit, and finally measure the first qubit. The function should return the circuit, print the circuit diagram using draw(). Print also the measurement result of the first qubit after executing the circuit." : {
+        "expected_output" : ["0: ─H───o─H─M─\n1: ─X─H─X─────"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/src/qibo/result.py"]
+    },
+
+    "Given the implementation of the `Symbol` and `PauliSymbol` classes in Qibo's symbols module, create a new symbolic operator class `H` for the Hadamard gate following the pattern used for the other symbolic Hamiltonians. It should inherit from `Symbol`, use the `matrices.H` matrix for initialization, set its name to `\"H\"`, and define `calculate_gate` to return `gates.H(self.target_qubit)`. Finally, instantiate an object of this new class and print its corresponding Hamiltonian matrix." : {
+        "expected_output" : ["Calculating the dense form of a symbolic Hamiltonian"],
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/symbols.py",
+                              "qiboKnow/qibo/src/qibo/hamiltonians/hamiltonians.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/src/qibo/backends/__init__.py"]
+    },
+
+    "Using the `qibo.quantum_info` module, write a unit test that verifies the correct behavior of the `qi.commutator` function. Create the single-qubit Pauli basis using `qi.pauli_basis(1)` and check that the commutator between the Pauli-X (index 1) and Pauli-Y (index 2) matrices equals `2j * Pauli-Z (index 3)`. Use `numpy.allclose` to compare the matrices and raise an `AssertionError` if the test fails and print 'correct' if it passes. execute the test at the end" : {
+        "expected_output" : "correct",
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/quantum_info/pauli_basis.py",
+                              "qiboKnow/qibo/src/qibo/quantum_info/linalg_operation.py",
+                              "qiboKnow/qibo/tests/test_quantum_info_linalg_operations.py"]
+    },
+
+    "Write a unit test to verify the qibo function that performs the Schmidt decomposition. Create a two-qubit Bell state explicitly as a NumPy array with the values `[1/√2, 0, 0, 1/√2]`, corresponding to the state `(1/√2) * (|00⟩ + |11⟩)`. Perform the Schmidt decomposition of this state with a partition on the first qubit, and assert that the resulting Schmidt coefficients array has length 2. Finally, execute the test function at the end." : {
+        "expected_output" : "",
+        "expected_sources" : ["qiboKnow/qibo/src/qibo/quantum_info/test_quantum_info_linalg_operations.py",
+                              "qiboKnow/qibo/src/qibo/quantum_info/linalg_operation.py",
+                              "qiboKnow/qibo/doc/source/api-reference/qibo.rst"]
+    },
+
+    "Create a 2-qubit quantum circuit that applies a Hadamard on the first qubit, then a controlled RX rotation with an angle of π/2 from the first to the second qubit, measures both qubits, executes the circuit, and prints the resulting measurement probabilities." : {
+        "expected_output" : ["[0.5  0.   0.25 0.25]"],
+        "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/examples.rst",
+                              "qiboKnow/qibo/src/qibo/models/circuit.py",
+                              "qiboKnow/qibo/src/qibo/gates/gates.py",
+                              "qiboKnow/qibo/src/qibo/result.py"]
+    },
+
+    "Using the qibo library, write a script to find the 5-qubit state |11111> with its built-in Grover's algorithm. 1. Create an oracle circuit (5 qubits + 1 ancilla) that marks the |11111> state. 2. Create a superposition circuit (5 qubits) that applies an H gate to each qubit. Run the algorithm, assuming 1 solution, and print the resulting solution and the number of iterations." : {
+        "expected_output" : ["['11111']", "4"],
+        "expected_sources" : []
+    },
+
+    "```from qibo import Circuit, gates\ndef bool_commute(gate1, gate2):\nreturn gate1.commutes(gate2)\n``` starting from this function create a unit test called `test_hadamard_commute` that creates two Hadamard gates on the same qbit and checks if they commute and if it works prints 'H(0) and H(0) commute? True', at the end run the test function." : {
+        "expected_output" : ["H(0) and H(0) commute? True"],
+        "expected_sources" : []
+    },
+
+    "Create a python script with qibo that creates a one qbit circuit. add a depolarizing channel with lambda 0.1, draw the circuit and execute it printing the resulting density matrix." : {
+        "expected_output" : ["0: ─D─", "(0.95+0j)|0><0| + (0.05+0j)|1><1|", "[[0.95+0.j 0.  +0.j] [0.  +0.j 0.05+0.j]]"],
+        "expected_sources" : []
+    },
+
+    "```from qibo import Circuit, gates\ncircuit = Circuit(1)\ncircuit.add(gates.DepolarizingChannel(0, lam=0.1))\ncircuit.draw()\nresult = circuit()``` this code doesn't work, fix it and print the resulting density matrix after executing the circuit." : {
+        "expected_output" : ["0: ─D─","(0.95+0j)|0><0| + (0.05+0j)|1><1|", "[[0.95+0.j 0.  +0.j] [0.  +0.j 0.05+0.j]]"],
+        "expected_sources" : []
+    },
+
+    "create a python code that initialize the adjacency matrix of a 4 nodes complete graph, using qibo create the circuit that encodes an undirected graph state for this graph, draw the circuit" : {
+        "expected_output" : ["0: ─H─o─o─o───────\n1: ─H─Z─|─|─o─o───\n2: ─H───Z─|─Z─|─o─\n3: ─H─────Z───Z─Z─"],
+        "expected_sources" : []
+    },
+
+    "```from qibo import Circuit, gates\ncircuit = Circuit(1)\ncircuit.add(gates.H(0))\noutput = circuit.add(gates.M(0, collapse=True))\ncircuit.add(gates.H(0))\nresult = circuit(nshots=1)\nprint(result)\n``` this code doesn't work, fix it and print the resulting measurement object after executing the circuit with 1 shot." : {
+        "expected_output" : ["(0.5+0j)|0><0| + (0.5+0j)|0><1| + (0.5+0j)|1><0| + (0.5+0j)|1><1|", "(0.5+0j)|0><0| + (-0.5+0j)|0><1| + (-0.5+0j)|1><0| + (0.5+0j)|1><1|"],
+        "expected_sources" : []
+    },
+
+      "Write a Python test function using the qibo library to check the .invert() circuit method. Inside the test function, create a first three qbit circuit with any gates you choose. Then, create a second circuit by inverting the first. Combine both circuits by adding them. Finally, execute the combined circuit, check if the final state matches the state [1.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j], and print 'Test successful' if it does, at the end run the test function." : {
+        "expected_output" : ["Test successful", "test successful"],
+        "expected_sources" : []
+    }
+
+}

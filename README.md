@@ -1,78 +1,54 @@
-# Qibollm
+# QiboLLM
 
-Qibollm aims to develop an AI coding assistant with expertise in the Qibo codebase.
+This repository contains all the python scripts used for QiboLLM project.
 
-## Installation
+## Installation 
 
-This project relies on the following frameworks:
+All dependencies are managed by [Poetry](https://python-poetry.org/docs/#installation), to get set run 
 
-- [**Ollama**](https://ollama.com/) – Easily run large language models (LLMs) locally.
-- [**OpenWebUI**](https://openwebui.com/) – A user-friendly interface for interacting with LLMs.
+```bash
+git clone https://github.com/qiboteam/qibollm.git
+cd qibollm
 
-You have two main options to run this project:
-
-- **Using the Docker image**
-- **Installing locally with Python and Bash scripts**
-
-In both cases, you will need to install **Ollama** first: [https://ollama.com/download](https://ollama.com/download)
-
-
-### Python installation
-
-You can install Open WebUI using `pip`, the Python package manager.  
-Make sure you're using **Python 3.11**, as other versions may cause compatibility issues.
-
-```console 
-pip install open-webui
+poetry install
 ```
 
-after that, you can run the following command to start the Open WebUI server:
+To run local model you also have to install [Ollama](https://ollama.com/) and pull the model you want to use.
+If you use an Ollama server be careful to set the correct base url in settings.
 
-```console
-open-webui run serve
-```
-Once started, the Open WebUI server will be available at [http://localhost:8080](http://localhost:8080).
 
-### Model installation
+## Scripts
 
-In order to use an LLM, you can choose your model from the Ollama model list.
+in ```python_script/``` there are all the necessary script to reproduce the RAG and agentic pipelines.
 
-1. Visit the [Ollama model list](https://ollama.com/models) to see available models.
-2. Use the following command to pull the desired model:
-```console
-ollama pull <model_name>
+to run the scripts simply run 
+
+```bash
+poetry run python python_scripts/script_name.py
 ```
 
-after pulling the model you can use it from terminal with the following command:
+### Quantum Computing Q&A
 
-```console
-ollama run <model_name>
-```
+There is a script for each experimental RAG pipeline with autoscoring of the answers, be sure to set correctly the knowledge base path, the scripts will automatically clone Qibo repository if not found in the specified path.
 
-if you want to use the model with Open WebUI, you can run the following command:
+- ```no_RAG.py``` contains the script where LLM can be queried without RAG
 
-```console
-open-webui run serve --model <model_name>
-```
+- ```RAG_semantic.py``` contains the script where LLM can be queried with semantic RAG pipeline
 
-### Docker Image
+- ```RAG_hybrid```contains contains the script where LLM can be queried with hybrid RAG pipeline
 
-You can run the Open WebUI server using Docker.  
-Make sure you have [Docker installed](https://docs.docker.com/desktop/) on your system.
+### Docstring generation
 
-To start the Open WebUI server, run the following command:
-```console
-docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:main
-```
+in ```docstring_gen.py``` there is the script to generate docstrings for the Qibo library using hybrid RAG pipeline. you can set the file path of the code for which you want to generate docstring in the `setting.json` file.
 
-To access the Open WebUI server, open your web browser and navigate to [http://localhost:3000](http://localhost:3000).
+### Agentic workflows
 
+For the agentic workflows:
 
-### Other Options
+- ```agent.py``` contains the script used for the agentic workflow for Issue resolution in the Qibo library. 
 
-There are other ways to run the Open WebUI server.  
-For more details, refer to the official documentation:
+- ```agentic_core.py``` contains the script for the agentic workflow used to generate the qibo_core module
 
-- [Open WebUI Documentation](https://docs.openwebui.com/)
-- [Ollama Documentation](https://docs.ollama.com/)
+## Settings
 
+All the settings for the pipelines are contained in the `settings/settings.json` file, where you can set all the parameters for the vector store, the LLM and the agentic workflow. In the same directory there are the files with the questions and golden answers for the evaluation of the RAG pipelines.
