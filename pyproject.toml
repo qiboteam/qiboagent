@@ -48,6 +48,7 @@ networkx = "3.4.2"
 sentence-transformers = "^5.2.2"
 unstructured = {extras = ["md"], version = "^0.18.32"}
 maturin = "^1.11.5"
+streamlit = "^1.54.0"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "7.1.0"
