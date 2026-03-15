@@ -128,6 +128,44 @@ start_btn = st.button("🚀 Start Agent", type="primary", disabled=st.session_st
 log_container = st.container()
 
 # ─────────────────────────── Agent Runner ─────────────────────────────────
+def render_step(step, idx):
+    step_type = step["type"]
+    title = step["title"]
+    content = step["content"]
+
+    if step_type == "user":
+        with st.chat_message("user"):
+            st.markdown(content[:500])
+
+    elif step_type == "thought":
+        with st.expander(f"🧠 Step {idx} — {title}", expanded=False):
+            st.markdown(content)
+
+    elif step_type == "tool_call":
+        with st.expander(f"🔧 Step {idx} — {title}", expanded=False):
+            st.code(content, language="json")
+
+    elif step_type == "tool_output":
+        with st.expander(f"📋 Step {idx} — {title}", expanded=False):
+            if len(content) > 3000:
+                st.code(content[:3000] + "\n\n... (truncated)", language="text")
+            else:
+                st.code(content, language="text")
+
+    elif step_type == "status":
+        st.info(f"**{title}**: {content}")
+
+    elif step_type == "success":
+        st.success(f"**{title}**: {content}")
+
+    elif step_type == "error":
+        with st.expander(f"❌ Step {idx} — {title}", expanded=True):
+            st.error(content)
+
+    elif step_type == "result":
+        st.success(f"**{title}**")
+
+
 def run_agent(issue_number, user_prompt, model_name, base_url,
               use_reasoning, prompt_choice, owner, repo):
     """
@@ -137,57 +175,14 @@ def run_agent(issue_number, user_prompt, model_name, base_url,
     steps = st.session_state.agent_steps
     steps.clear()
 
-    # ── 1. Check model availability ──
-    with log_container:
-        status_placeholder = st.empty()
-        
     def update_log(step_dict):
-        """Helper to update the log in real-time"""
         steps.append(step_dict)
         with log_container:
             render_step(step_dict, len(steps) - 1)
 
-    def render_step(step, idx):
-        """Render a single step with appropriate formatting"""
-        step_type = step["type"]
-        title = step["title"]
-        content = step["content"]
-
-        if step_type == "user":
-            with st.chat_message("user"):
-                st.markdown(content[:500])
-
-        elif step_type == "thought":
-            with st.expander(f"🧠 Step {idx} — {title}", expanded=False):
-                st.markdown(content)
-
-        elif step_type == "tool_call":
-            with st.expander(f"🔧 Step {idx} — {title}", expanded=False):
-                st.code(content, language="json")
-
-        elif step_type == "tool_output":
-            with st.expander(f"📋 Step {idx} — {title}", expanded=False):
-                if len(content) > 3000:
-                    st.code(content[:3000] + "\n\n... (truncated)", language="text")
-                else:
-                    st.code(content, language="text")
-
-        elif step_type == "status":
-            st.info(f"**{title}**: {content}")
-
-        elif step_type == "success":
-            st.success(f"**{title}**: {content}")
-
-        elif step_type == "error":
-            with st.expander(f"❌ Step {idx} — {title}", expanded=True):
-                st.error(content)
-
-        elif step_type == "result":
-            st.success(f"**{title}**")
-
-    # Update log status
+    # ── 1. Check model availability ──
     update_log({"type": "status", "title": "🔍 Checking model",
-                  "content": f"Verifying availability of `{model_name}`..."})
+                "content": f"Verifying availability of `{model_name}`..."})
 
     if not check_ollama_llm_availability(model_name, base_url):
         st.session_state.agent_error = f"Model '{model_name}' is not available at {base_url}"
@@ -196,7 +191,7 @@ def run_agent(issue_number, user_prompt, model_name, base_url,
         return
 
     update_log({"type": "success", "title": "✅ Model ready",
-                  "content": f"`{model_name}` is available."})
+                "content": f"`{model_name}` is available."})
 
     # ── 2. Build settings dict and init agent via agent.py ──
     runtime_settings = {
@@ -225,38 +220,42 @@ def run_agent(issue_number, user_prompt, model_name, base_url,
         return
 
     update_log({"type": "status", "title": "🤖 Agent initialized",
-                  "content": f"System prompt: {prompt_choice}\nIssue: #{issue_number}"})
+                "content": f"System prompt: {prompt_choice}\nIssue: #{issue_number}"})
 
-    # ── 3. Invoke the agent ──
+    # ── 3. Stream the agent ──
     config = {"configurable": {"thread_id": f"streamlit_{issue_number}_{time.time()}"}}
 
+    last_message_content = ""
+    result = None
+    seen_message_ids = set()
+
     try:
-        result = agent.invoke(
+        for chunk in agent.stream(
             {"messages": [{"role": "user", "content": user_prompt}]},
             config=config,
-        )
-    except Exception as e:
-        st.session_state.agent_error = f"Error during agent execution: {e}"
-        update_log({"type": "error", "title": "❌ Execution Error",
-                    "content": str(e)})
-        return
+            stream_mode="values",
+        ):
+            messages = chunk.get("messages", [])
+            if not messages:
+                continue
 
-    # ── 4. Parse result messages into displayable steps (REAL-TIME) ──
-    last_message_content = ""
-    if "messages" in result:
-        for msg in result["messages"]:
+            msg = messages[-1]
+
+            msg_id = getattr(msg, "id", None) or id(msg)
+            if msg_id in seen_message_ids:
+                continue
+            seen_message_ids.add(msg_id)
+
             if msg.type == "human":
                 update_log({"type": "user", "title": "👤 User", "content": msg.content})
 
             elif msg.type == "ai":
                 last_message_content = msg.content
 
-                # Reasoning / thoughts
                 if msg.content and '"name": "ResponseFormat"' not in msg.content:
                     update_log({"type": "thought", "title": "🧠 AI Reasoning",
-                                      "content": msg.content})
+                                "content": msg.content})
 
-                # Tool calls
                 if hasattr(msg, "tool_calls") and msg.tool_calls:
                     for tc in msg.tool_calls:
                         update_log({
@@ -274,12 +273,20 @@ def run_agent(issue_number, user_prompt, model_name, base_url,
                     "tool_name": msg.name,
                 })
 
-    # ── 5. Extract the final result ──
+            result = chunk
+
+    except Exception as e:
+        st.session_state.agent_error = f"Error during agent execution: {e}"
+        update_log({"type": "error", "title": "❌ Execution Error",
+                    "content": str(e)})
+        return
+
+    # ── 4. Extract the final result ──
     final_patch = None
     final_explanation = "No explanation provided."
     final_file_path = "Unknown"
 
-    if "structured_response" in result and result["structured_response"]:
+    if result and "structured_response" in result and result["structured_response"]:
         resp = result["structured_response"]
         final_patch = resp.proposed_patch
         final_explanation = resp.explanation
@@ -311,7 +318,7 @@ def run_agent(issue_number, user_prompt, model_name, base_url,
             "model": model_name,
         }
         update_log({"type": "result", "title": "✅ Patch generated successfully",
-                       "content": final_explanation})
+                    "content": final_explanation})
     else:
         st.session_state.agent_error = "The agent did not produce a valid patch."
         update_log({
@@ -328,7 +335,7 @@ if start_btn:
     st.session_state.agent_error = None
     st.session_state.agent_steps = []
 
-    with st.spinner("⏳ Agent running... This may take a few minutes."):
+    with st.spinner("⏳ Agent running..."):
         run_agent(
             issue_number=int(issue_number),
             user_prompt=user_prompt,
@@ -349,41 +356,7 @@ if st.session_state.agent_steps:
     st.subheader("📜 Execution Log")
 
     for idx, step in enumerate(st.session_state.agent_steps):
-        step_type = step["type"]
-        title = step["title"]
-        content = step["content"]
-
-        if step_type == "user":
-            with st.chat_message("user"):
-                st.markdown(content[:500])
-
-        elif step_type == "thought":
-            with st.expander(f"🧠 Step {idx} — {title}", expanded=False):
-                st.markdown(content)
-
-        elif step_type == "tool_call":
-            with st.expander(f"🔧 Step {idx} — {title}", expanded=False):
-                st.code(content, language="json")
-
-        elif step_type == "tool_output":
-            with st.expander(f"📋 Step {idx} — {title}", expanded=False):
-                if len(content) > 3000:
-                    st.code(content[:3000] + "\n\n... (truncated)", language="text")
-                else:
-                    st.code(content, language="text")
-
-        elif step_type == "status":
-            st.info(f"**{title}**: {content}")
-
-        elif step_type == "success":
-            st.success(f"**{title}**: {content}")
-
-        elif step_type == "error":
-            with st.expander(f"❌ Step {idx} — {title}", expanded=True):
-                st.error(content)
-
-        elif step_type == "result":
-            st.success(f"**{title}**")
+        render_step(step, idx)
 
 # ─────────────────────────── Error Display ────────────────────────────────
 if st.session_state.agent_error:
