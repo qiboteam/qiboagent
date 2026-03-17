@@ -1,5 +1,7 @@
 # QiboAgent
 
+[![arXiv](https://img.shields.io/badge/arXiv-2603.15538-b31b1b.svg)](https://arxiv.org/abs/2603.15538)
+
 This repository contains all the Python scripts used for the QiboAgent paper, along with a containerized UI interface.
 
 ## 🚀 Quickstart: QiboAgent UI (Docker)
