@@ -73,8 +73,49 @@ There is a script for each experimental RAG pipeline featuring autoscoring of th
 * **agent.py**: Agentic workflow for Issue resolution within the Qibo library.
 * **agentic_core.py**: Agentic workflow used to generate the `qibo_core` module.
 
+## 🛠️ MCP Server (Model Context Protocol)
+
+The Qibo Expert is also available as an MCP server, allowing you to use it as a tool in Gemini CLI or other MCP-compatible clients.
+
+### Run the MCP Server
+
+```bash
+poetry run python mcp_server/qibo_expert.py
+```
+
+### Registration with MCP Clients
+
+You can add this server to your favorite MCP-compatible client to expose the `ask_qibo_expert` tool. Note that you should replace `<ABSOLUTE_PATH_TO_REPO>` with the actual path to this repository on your machine.
+
+#### Gemini CLI
+Add the server using the `mcp add` command:
+```bash
+gemini mcp add qibo-expert poetry run python <ABSOLUTE_PATH_TO_REPO>/mcp_server/qibo_expert.py
+```
+
+#### Claude Code (Anthropic CLI)
+Register the tool globally using:
+```bash
+claude mcp add qibo-expert --scope user poetry run python <ABSOLUTE_PATH_TO_REPO>/mcp_server/qibo_expert.py
+```
+
+#### OpenCode
+Add the following to your `~/.opencode/config.json` (global) or `opencode.json` (project):
+```json
+{
+  "mcp": {
+    "qibo-expert": {
+      "type": "local",
+      "command": "poetry",
+      "args": ["run", "python", "<ABSOLUTE_PATH_TO_REPO>/mcp_server/qibo_expert.py"],
+      "enabled": true
+    }
+  }
+}
+```
+
 ## ⚙️ Settings
 
-All pipeline settings are contained in the `settings/settings.json` file. Here, you can configure parameters for the vector store, the LLM, and the agentic workflows.
+All pipeline settings are contained in the `settings_json/settings.json` file. Here, you can configure parameters for the vector store, the LLM, and the agentic workflows.
 
 In the same directory, you will find files containing the questions and golden answers used for evaluating the RAG pipelines.
