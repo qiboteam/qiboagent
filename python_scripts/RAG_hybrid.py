@@ -13,6 +13,7 @@ import os
 import hashlib
 import re
 import time
+import pickle
 import tempfile
 import subprocess, requests
 import sys
@@ -51,13 +52,21 @@ def load_json_settings(file_path: str) -> dict:
     
 def check_ollama_llm_availability(model_name: str, base_url: str) -> bool:
     """Check if an Ollama model is available; if not, attempt to pull it."""
-    # Check if Ollama server is reachable
+    # Check if Ollama server is reachable 
     try:
         # get list of available models, ollama api: https://docs.ollama.com/api
         response = requests.get(f"{base_url}/api/tags", timeout=5)
-    except (requests.ConnectionError, requests.Timeout):
-        logger.error(f"Cannot connect to Ollama at {base_url}. Is the server running?")
-        return False
+    except requests.exceptions.RequestException:
+        logger.warning("Ollama server not reachable, trying to start it...")
+
+        # try to start ollama server
+        try:
+            subprocess.Popen(["ollama", "serve"])
+            time.sleep(3)  # give it time to start
+            response = requests.get(f"{base_url}/api/tags", timeout=5)
+        except Exception as e:
+            logger.error("Failed to start Ollama server at %s", base_url)
+            raise RuntimeError("Ollama server not found and could not be started") from e
 
     # Check if model is already downloaded
     model_short = model_name.split(":")[0]
@@ -77,6 +86,24 @@ def check_ollama_llm_availability(model_name: str, base_url: str) -> bool:
     logger.info(f"Model '{model_name}' pulled successfully.")
     return True
 
+def check_qibo_repo_availability(project_root : str) -> bool:
+    """Check if Qibo repository is available locally, if not clone it.
+
+    If repo_path is None, use project root (parent of python_scripts) and clone into qiboKnow/qibo.
+    """
+    project_root = Path(project_root)
+    base_dir = project_root / "qiboKnow"
+    qibo_dir = base_dir / "qibo"
+
+    if qibo_dir.exists():
+        return True
+
+    logger.info("Cloning Qibo repository...")
+    subprocess.run(
+        ["git", "clone", "https://github.com/qiboteam/qibo.git", str(qibo_dir)],
+        check=True
+    )
+    return qibo_dir.exists()
 
 def initialize_llm(settings: dict):
     """Initialize LLM based on settings configuration."""
@@ -350,6 +377,17 @@ def build_vectorstore(code_docs, doc_docs, persist="./kb_chroma"):
     )
     return vs
 
+def load_vectorstore(persist="./kb_chroma"):
+    """Load a persisted Chroma vectorstore from disk."""
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True}
+    )
+    logger.info(f"Loading vectorstore from {persist}...")
+    vs = Chroma(persist_directory=persist, embedding_function=embeddings)
+    return vs
+
 # ------------------------ HYBRID RETRIEVER ------------------------ #
 
 class HybridRetriever:
@@ -374,7 +412,7 @@ class HybridRetriever:
         """Generate a unique hash for the document based on its content."""
         return hashlib.sha256(doc.page_content.strip().encode("utf-8")).hexdigest()
 
-    def retrieve(self, query: str, k: int = 4) -> List[Document]:
+    def retrieve(self, query: str, k: int = 6) -> List[Document]:
         # BM25 Retrieval
         query_tokens = preprocess_text(query)
         raw_bm25_scores = self.bm25.get_scores(query_tokens)
@@ -426,6 +464,34 @@ class HybridRetriever:
 
     def invoke(self, query: str, k: int = 4) -> List[Document]:
         return self.retrieve(query, k=k)
+    
+
+def save_retriever(retriever: HybridRetriever, cache_path: str = "./retriever_cache.pkl"):
+    """Save the retriever's documents and BM25 weight to a cache file for future loading."""
+    data = {
+        "docs": retriever.docs,
+        "bm25_weight": retriever.bm25_weight,
+    }
+    path = Path(cache_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as f:
+        pickle.dump(data, f)
+
+def load_retriever(cache_path: str = "./retriever_cache.pkl", vectorstore=None) -> HybridRetriever | None:
+    """Load the retriever's documents and BM25 weight from a cache file, and reconstruct the HybridRetriever. Requires the vectorstore to be provided."""
+    path = Path(cache_path)
+    if path.exists():
+        try:
+            with open(path, "rb") as f:
+                data = pickle.load(f)
+            if vectorstore is None:
+                logger.warning("Vectorstore must be provided to rebuild retriever.")
+                return None
+            return HybridRetriever(data["docs"], vectorstore, bm25_weight=data["bm25_weight"])
+        except Exception as e:
+            logger.warning(f"Failed to load retriever from cache: {e}")
+            return None
+    return None
 
 def create_qa_chain(llm, retriever):
     """Create a RAG chain using LCEL (LangChain Expression Language)."""
