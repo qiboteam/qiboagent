@@ -28,9 +28,9 @@ st.set_page_config(page_title="Qibo AI Assistant", layout="wide", page_icon="⚛
 
 # --- Fetch Available Models from Ollama ---
 @st.cache_resource(show_spinner="Searching Ollama models ...")
-def get_ollama_models():
+def get_ollama_models(base_url = OLLAMA_BASE_URL):
     try:
-        response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=3)
+        response = requests.get(f"{base_url}/api/tags", timeout=3)
         if response.status_code == 200:
             models_data = response.json()
             model_names = [model["name"] for model in models_data.get("models", [])]
@@ -40,7 +40,7 @@ def get_ollama_models():
         try:
             subprocess.Popen(["ollama", "serve"])
             time.sleep(3)
-            response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
+            response = requests.get(f"{base_url}/api/tags", timeout=5)
             if response.status_code == 200:
                 models_data = response.json()
                 model_names = [model["name"] for model in models_data.get("models", [])]
@@ -175,7 +175,9 @@ def get_context_usage(messages: list, memory_window: int, context_window: int) -
 if "model_confirmed" not in st.session_state:
     st.session_state.model_confirmed = False
 
-available_models = get_ollama_models()
+settings = load_json_settings(str(ROOT_DIR / "settings_json" / "settings.json"))
+base_url = settings["llm"]["base_url"]
+available_models = get_ollama_models(base_url)
 
 # Failsafe if Ollama is unreachable
 if not available_models:
