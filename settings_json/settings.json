@@ -9,7 +9,7 @@
   "llm": {
     "provider": "ollama",                                      
     "model_name": "gemma3:1b",                               
-    "base_url": "http://localhost:11434",                  
+    "base_url": "http://127.0.0.1:11434",                  
     "api_key": "your api_key",                                 
     "reasoning": false                                         
   },

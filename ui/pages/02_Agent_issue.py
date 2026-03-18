@@ -8,12 +8,14 @@ import sys
 import json
 import re
 import time
+import subprocess
 import requests
 from pathlib import Path
 
 # --- Path Configuration ---
 ROOT_DIR = Path(__file__).parent.parent.parent
 sys.path.append(str(ROOT_DIR / "python_scripts"))
+OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 
 # Import everything we need from the existing agent module
 from agent import (
@@ -25,8 +27,57 @@ from agent import (
     SYSTEM_PROMPT, SYSTEM_PROMPT2,
 )
 
-st.set_page_config(page_title="Qibo Agent — Issue Resolver", layout="wide", page_icon="🔧")
+st.set_page_config(page_title="QiboAgent — Issue Resolver", layout="wide", page_icon="🔧")
 
+# ─────────────────────────── Fetch Available Models from Ollama ────────────
+@st.cache_resource(show_spinner=False)
+def get_ollama_models(base_url=OLLAMA_BASE_URL):
+    """Try to fetch models from Ollama, auto-start if not running."""
+    max_retries = 3
+    
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(f"{base_url}/api/tags", timeout=5)
+            if response.status_code == 200:
+                models_data = response.json()
+                model_names = [model["name"] for model in models_data.get("models", [])]
+                return model_names if model_names else []
+        except requests.exceptions.RequestException:
+            if attempt == 0:
+                # start ollama server
+                try:
+                    subprocess.Popen(["ollama", "serve"], 
+                                   stdout=subprocess.DEVNULL, 
+                                   stderr=subprocess.DEVNULL)
+                    time.sleep(10) 
+                except Exception:
+                    pass
+            else:
+                time.sleep(3)  
+    
+    return []
+
+# INITIALIZE MODELS AT STARTUP - BEFORE ANY UI RENDERING
+with st.spinner("Loading Ollama models..."):
+    settings_path = ROOT_DIR / "settings_json" / "settings.json"
+    if settings_path.exists():
+        settings = load_json_settings(str(settings_path))
+    else:
+        settings = {"llm": {"provider": "ollama", "model_name": "gemma3:1b",
+                            "base_url": "http://127.0.0.1:11434", "reasoning": False}}
+    
+    base_url = settings["llm"].get("base_url", OLLAMA_BASE_URL)
+    available_models = get_ollama_models(base_url)
+
+if not available_models:
+    st.error("⚠️ Ollama is still starting or no models were found.")
+    st.info("Please wait a moment and click **Refresh**.")
+    if st.button("🔄 Refresh Models", type="primary", use_container_width=True):
+        get_ollama_models.clear()
+        st.rerun()
+    st.stop()
+
+# render the UI only after we have the models
 st.title("🔧 Qibo Agent — GitHub Issue Resolver")
 st.caption("Analyze and propose fixes for Qibo GitHub issues with an autonomous agent")
 
@@ -40,42 +91,28 @@ for key, default in {
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ─────────────────────────── Fetch Available Models from Ollama ────────────
-@st.cache_resource
-def get_ollama_models(base_url="http://localhost:11434"):
-    try:
-        response = requests.get(f"{base_url}/api/tags", timeout=5)
-        if response.status_code == 200:
-            models_data = response.json()
-            model_names = [model["name"] for model in models_data.get("models", [])]
-            return model_names if model_names else ["No models available"]
-        else:
-            return ["Error: Could not fetch models"]
-    except requests.exceptions.RequestException:
-        return ["Ollama not running"]
-
 # ─────────────────────────── Sidebar Config ───────────────────────────────
 with st.sidebar:
     st.header("⚙️ Agent Configuration")
 
-    settings_path = ROOT_DIR / "settings_json" / "settings.json"
-    if settings_path.exists():
-        settings = load_json_settings(str(settings_path))
-    else:
-        settings = {"llm": {"provider": "ollama", "model_name": "qwen3-coder:30b",
-                            "base_url": "http://localhost:11434", "reasoning": False}}
-
-    base_url = st.text_input(
-        "Ollama Base URL",
-        value=settings["llm"].get("base_url", "http://localhost:11434"),
-        help="Base URL for your Ollama instance"
+    # Allow URL change
+    new_base_url = st.text_input(
+        "Ollama URL",
+        value=base_url,
+        help="Change Ollama server URL"
     )
-
-    # Fetch available models
-    available_models = get_ollama_models(base_url)
-    default_model = settings["llm"].get("model_name", "qwen3-coder:30b")
     
-    # Set default index
+    # If URL changed, reload models with new URL
+    if new_base_url != base_url:
+        base_url = new_base_url
+        get_ollama_models.clear()
+        with st.spinner("Reloading models with new URL..."):
+            available_models = get_ollama_models(base_url)
+        if not available_models:
+            st.error("⚠️ Cannot connect to Ollama at this URL")
+            st.stop()
+
+    default_model = settings["llm"].get("model_name", "gemma3:1b")
     try:
         default_idx = available_models.index(default_model)
     except ValueError:
@@ -88,9 +125,8 @@ with st.sidebar:
         help="Choose a model from your Ollama instance"
     )
 
-    # Refresh button
     if st.button("🔄 Refresh Models", use_container_width=True):
-        st.cache_resource.clear()
+        get_ollama_models.clear()
         st.rerun()
 
     st.divider()
@@ -182,7 +218,7 @@ def run_agent(issue_number, user_prompt, model_name, base_url,
 
     # ── 1. Check model availability ──
     update_log({"type": "status", "title": "🔍 Checking model",
-                "content": f"Verifying availability of `{model_name}`..."})
+                "content": f"Verifying model availability"})
 
     if not check_ollama_llm_availability(model_name, base_url):
         st.session_state.agent_error = f"Model '{model_name}' is not available at {base_url}"
@@ -191,7 +227,7 @@ def run_agent(issue_number, user_prompt, model_name, base_url,
         return
 
     update_log({"type": "success", "title": "✅ Model ready",
-                "content": f"`{model_name}` is available."})
+                "content": f"[{model_name}] is available."})
 
     # ── 2. Build settings dict and init agent via agent.py ──
     runtime_settings = {
@@ -260,7 +296,7 @@ def run_agent(issue_number, user_prompt, model_name, base_url,
                     for tc in msg.tool_calls:
                         update_log({
                             "type": "tool_call",
-                            "title": f"🔧 Tool Call: `{tc['name']}`",
+                            "title": f"🔧 Tool Call: [{tc['name']}]",
                             "content": json.dumps(tc["args"], indent=2),
                             "tool_name": tc["name"],
                         })
@@ -268,7 +304,7 @@ def run_agent(issue_number, user_prompt, model_name, base_url,
             elif msg.type == "tool":
                 update_log({
                     "type": "tool_output",
-                    "title": f"📋 Tool Output: `{msg.name}`",
+                    "title": f"📋 Tool Output: [{msg.name}]",
                     "content": msg.content,
                     "tool_name": msg.name,
                 })
@@ -370,9 +406,9 @@ if st.session_state.agent_result:
 
     col_info, col_actions = st.columns([3, 1])
     with col_info:
-        st.markdown(f"**Issue:** `#{result['issue_number']}`")
-        st.markdown(f"**File:** `{result['file_path']}`")
-        st.markdown(f"**Model:** `{result['model']}`")
+        st.markdown(f"**Issue:** [#{result['issue_number']}]")
+        st.markdown(f"**File:** [{result['file_path']}]")
+        st.markdown(f"**Model:** [{result['model']}]")
     with col_actions:
         output_dir = ROOT_DIR / "agent_outputs"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -381,7 +417,7 @@ if st.session_state.agent_result:
         if st.button("💾 Save Patch to File", use_container_width=True):
             with open(output_file, "w") as f:
                 json.dump(result, f, indent=4)
-            st.success(f"Saved to `{output_file.name}`")
+            st.success(f"Saved to [{output_file.name}]")
 
     # Explanation
     st.markdown("### 📝 Explanation")
