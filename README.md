@@ -1,6 +1,7 @@
 # QiboAgent
 
 [![arXiv](https://img.shields.io/badge/arXiv-2603.15538-b31b1b.svg)](https://arxiv.org/abs/2603.15538)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19095988.svg)](https://doi.org/10.5281/zenodo.19095988)
 
 This repository contains all the Python scripts used for the QiboAgent paper, along with a UI and a Model Context Protocol (MCP) server exposing the Qibo Expert RAG pipeline as a tool.
 
