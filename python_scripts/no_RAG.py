@@ -4,6 +4,7 @@ LLM Autoscoring without RAG
 """
 
 import logging
+import os
 from tqdm import tqdm
 import sys
 import re
@@ -17,6 +18,7 @@ from langchain_ollama import OllamaLLM
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.rate_limiters import InMemoryRateLimiter
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -57,10 +59,6 @@ You can append gates to a Circuit object through the method `add` and execute th
     ])
 
 #------------------------- UTILS AND AUTO-SCORING------------------------ #
-
-def _normalize_text(s: str) -> str:
-    """Normalize text by removing extra whitespace."""
-    return re.sub(r"\s+", " ", s.strip())
 
 def extract_code(answer: str) -> str:
     """Extract the first Python code block from the answer."""
@@ -126,89 +124,222 @@ def get_pylint_score(
 
     return 0.0
 
-def auto_scoring(results: list, golden_answers: dict, model_name: str):
-    """Score batch answers: execute code, match expected output, detect hallucinations, compute pylint score."""
+def save_json(data, path: str):
+    """Write data to a JSON file atomically, so that a crash never leaves a truncated file."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    tmp_path.replace(path)
+
+
+def _normalize_and_extract(text: str) -> str:
+    """
+    Normalize text by:
+    1. Extracting meaningful content (remove log prefixes, timestamps)
+    2. Normalizing whitespace
+    3. Standardizing numeric formats
+    """
+    if not text:
+        return ""
+    
+    # Remove log prefixes
+    log_patterns = [
+        r'\[.*?\|.*?\|.*?\]:\s*',  # [Qibo x.x.x|INFO|timestamp]:
+        r'\[INFO\]\s*',          
+        r'\[WARNING\]\s*',          
+        r'\[ERROR\]\s*',          
+        r'\[DEBUG\]\s*',          
+    ]
+    for pattern in log_patterns:
+        text = re.sub(pattern, '', text)
+
+    # Remove timestamps and dates
+    text = re.sub(r'\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}', '', text)
+
+    # Normalize multiple spaces
+    text = re.sub(r'\s+', ' ', text.strip())
+
+    # Standardize complex numbers in arrays
+    # 0.        +0.j -> 0.+0.j
+    text = re.sub(r'(\d)\s+\+', r'\1+', text)
+    text = re.sub(r'\+\s+(\d)', r'+\1', text)
+
+    # Remove spaces around special characters in arrays
+    text = re.sub(r'\s*\[\s*', '[', text)
+    text = re.sub(r'\s*\]\s*', ']', text)
+    text = re.sub(r'\s*j\s*', 'j', text)
+    
+    return text.strip()
+
+
+_NUMBER = re.compile(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?")
+
+
+def _tokenize(text: str) -> list:
+    """Split text into numbers (as floats) and single non-space characters."""
+    tokens, pos = [], 0
+    for m in _NUMBER.finditer(text):
+        tokens.extend(c for c in text[pos:m.start()] if not c.isspace())
+        tokens.append(float(m.group()))
+        pos = m.end()
+    tokens.extend(c for c in text[pos:] if not c.isspace())
+    return tokens
+
+
+def _numeric_match(expected_norm: str, actual_norm: str, rtol: float = 1e-5, atol: float = 1e-8) -> bool:
+    """
+    Check if the expected output appears in the actual output with the same text and numbers equal
+    within tolerance (numpy.isclose defaults), so that signed zeros (-0.) and floating point noise
+    (e.g. 1e-17 imaginary parts) in the printed result are not counted as errors.
+    """
+    exp = _tokenize(expected_norm)
+    act = _tokenize(actual_norm)
+    if not any(isinstance(t, float) for t in exp):
+        return False
+    n = len(exp)
+    for start in range(len(act) - n + 1):
+        for e, a in zip(exp, act[start:start + n]):
+            if isinstance(e, float) != isinstance(a, float):
+                break
+            if isinstance(e, float):
+                if abs(a - e) > atol + rtol * abs(e):
+                    break
+            elif a != e:
+                break
+        else:
+            return True
+    return False
+
+
+def _output_matches(expected: str, actual: str) -> bool:
+    """
+    Check if the normalized expected output is contained in the normalized actual output: exact
+    substring, or same text with numbers equal within tolerance. Empty strings never match.
+    """
+    expected_norm = _normalize_and_extract(expected)
+    actual_norm = _normalize_and_extract(actual)
+    if not expected_norm or not actual_norm:
+        return False
+    return expected_norm in actual_norm or _numeric_match(expected_norm, actual_norm)
+
+
+def auto_scoring(results: list, golden_answers: dict, model_name: str, save: bool = False, scoring_path: str | None = None):
+    """
+    Score batch answers with the same strict criterion used by every pipeline (no-RAG, semantic, hybrid).
+    An answer is correct only if its code block runs successfully (exit code 0, no timeout) and one of the
+    expected outputs, after normalization, is an exact substring of the produced stdout + stderr.
+    """
+    path = (scoring_path or f"./scoring/scoring_noRAG_json/scoring_{model_name.replace('/', '_')}.json") if save else None
     scores = []
-    for result in results:
+    for idx, result in enumerate(results, start=1):
         question = result["question"]
         golden_answer = golden_answers.get(question, {})
         score = {
             "model": model_name,
+            "question_number": idx, 
             "question": question,
-            "answer": result["answer"], 
+            "answer": result["answer"],
             "correctness": 0,
+            "grounding": 0,
             "hallucination": 1,
             "pylint score": 0.0,
+            "exit_code": None,
             "error": None
         }
         answer = result["answer"]
         raw_expected_output = golden_answer.get("expected_output", "")
-        
-        # Normalize expected_output into a list of non-empty strings
+
         if isinstance(raw_expected_output, str):
             expected_outputs = [raw_expected_output.strip()] if raw_expected_output.strip() else []
         elif isinstance(raw_expected_output, list):
             expected_outputs = [eo.strip() for eo in raw_expected_output if isinstance(eo, str) and eo.strip()]
         else:
             expected_outputs = []
-        
+
         code = extract_code(answer)
+
+        stdout = ""
+        stderr = ""
+        exit_code = None
 
         if code:
             with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
                 tmp.write(code)
                 tmp_path = tmp.name
             try:
+                logger.debug(f"Executing code for question {idx}: {question[:50]}...")
                 proc = subprocess.run(
-                    [sys.executable, tmp_path],
-                    capture_output=True,
-                    text=True,
+                    [sys.executable, tmp_path], 
+                    capture_output=True, 
+                    text=True, 
                     timeout=30
                 )
-                stdout = _normalize_text(proc.stdout or "")
-                stderr = _normalize_text(proc.stderr or "")
-                combined = (stdout + " " + stderr).strip()
-
-                if stderr:
-                    score["error"] = stderr
-
-                # Check correctness
-                if expected_outputs and any(_normalize_text(eo) in combined for eo in expected_outputs):
-                    score["correctness"] = 1
-                
-                # Check hallucination
-                if any(k in stderr for k in ("AttributeError", "NameError", "ImportError", "ModuleNotFoundError")):
-                    score["hallucination"] = 0
-
-                # Pylint score
-                score["pylint score"] = get_pylint_score(
-                    tmp_path,
-                    disable="missing-module-docstring,missing-final-newline"
-                )
-
+                stdout = proc.stdout or ""
+                stderr = proc.stderr or ""
+                exit_code = proc.returncode
+                logger.debug(f"Code execution completed for question {idx}")
             except subprocess.TimeoutExpired:
-                logger.warning(f"Timeout executing code for question: {question}")
-                score["error"] = "Execution timeout (30s)"
+                stderr = "Execution timeout (30s)"
+                logger.warning(f"Code execution timeout for question {idx}")
             except Exception as e:
-                logger.warning(f"Error executing code: {e}")
-                score["error"] = str(e)
+                stderr = f"Error executing code: {e}"
+                logger.error(f"Code execution error for question {idx}: {e}")
             finally:
                 try:
                     Path(tmp_path).unlink()
                 except Exception:
                     pass
-        
+
+        combined = (stdout + " " + stderr).strip()
+        score["exit_code"] = exit_code
+
+        if stderr and not any(k in stderr for k in ("DeprecationWarning", "FutureWarning", "UserWarning")):
+            score["error"] = stderr
+
+        # No code, timeouts and failed executions are never correct, even if a partial output matches
+        if exit_code == 0 and expected_outputs:
+            for eo in expected_outputs:
+                if _output_matches(eo, combined):
+                    score["correctness"] = 1
+                    break
+
+        if any(k in stderr for k in ("AttributeError", "NameError", "ImportError", "ModuleNotFoundError")):
+            score["hallucination"] = 0
+
+        # Pylint score
+        if code:
+            try:
+                with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
+                    tmp.write(code)
+                    tmp_path = tmp.name
+                score["pylint score"] = get_pylint_score(
+                    tmp_path,
+                    disable="missing-module-docstring,missing-final-newline"
+                )
+            finally:
+                try:
+                    Path(tmp_path).unlink()
+                except Exception:
+                    pass
+
+        sources = result.get("sources", [])
+        expected_sources = golden_answer.get("expected_sources", [])
+        if expected_sources:
+            for src in expected_sources:
+                if any(src in s for s in sources):
+                    score["grounding"] += 1
+            score["grounding"] /= len(expected_sources)
+
         scores.append(score)
+        # Saved after every question, so partial results survive a crash
+        if save:
+            save_json(scores, path)
 
-    # Save scores to file
-    output_dir = Path("./scoring/scoring_noRAG_json")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / f"scoring_{model_name.replace('/', '_')}.json"
+    if save:
+        logger.info(f"Saved scoring results to {path}")
 
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(scores, f, indent=2, ensure_ascii=False)
-    
-    logger.info(f"Scoring results saved to {output_file}")
     return scores
 
 def check_ollama_llm_availability(model_name: str, base_url: str) -> bool:
@@ -252,15 +383,18 @@ def initialize_llm(settings: dict):
         
         return OllamaLLM(model=model_name, base_url=base_url, temperature=0.0)
     elif settings["llm"]["provider"] == "google_genai":
+        # Spread the requests to stay within the Gemini API rate limit (requests per minute)
+        rate_limiter = InMemoryRateLimiter(requests_per_second=float(os.environ.get("GEMINI_RPM", "8")) / 60)
         return ChatGoogleGenerativeAI(model=settings["llm"]["model_name"],
                                       google_api_key=settings["llm"]["api_key"],
                                       temperature=0.0,
-                                      convert_system_message_to_human=True)
+                                      convert_system_message_to_human=True,
+                                      rate_limiter=rate_limiter)
     else:
         raise ValueError(f"Unsupported LLM provider: {settings['llm']['provider']}")
     
-def LLM_answer_questions(llm, questions: List[str]) -> List[dict]:
-    """Get answers from LLM for a list of questions using the global prompt template."""
+def LLM_answer_questions(llm, questions: List[str], output_file: str) -> List[dict]:
+    """Get answers from LLM for a list of questions using the global prompt template and save them to a JSON file."""
     results = []
     chain = prompt | llm | StrOutputParser()
     
@@ -280,7 +414,10 @@ def LLM_answer_questions(llm, questions: List[str]) -> List[dict]:
                 "question": question,
                 "answer": f"Error: {str(e)}"
             })
-    
+        # Saved after every question, so partial results survive a crash
+        save_json(results, output_file)
+
+    logger.info(f"Saved {len(results)} answers to {output_file}")
     return results
 
 #------------------------- MAIN ------------------------ #
@@ -308,10 +445,12 @@ def main():
     with open(golden_file, "r", encoding="utf-8") as f:
         golden_answers = json.load(f)
 
-    results = LLM_answer_questions(llm, questions)
+    output_file = f"./answers/answers_noRAG_json/answers_{settings['llm']['model_name'].replace('/', '_')}.json"
+    results = LLM_answer_questions(llm, questions, output_file)
 
     logger.info("Starting auto-scoring...")
-    scores = auto_scoring(results, golden_answers, settings['llm']['model_name'])
+    scores_file = f"./scoring/scoring_noRAG_json/scoring_{settings['llm']['model_name'].replace('/', '_')}.json"
+    scores = auto_scoring(results, golden_answers, settings['llm']['model_name'], save=True, scoring_path=scores_file)
     
     total_questions = len(scores)
     correct_answers = sum(1 for score in scores if score["correctness"] == 1)

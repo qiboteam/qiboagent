@@ -51,7 +51,7 @@
     },
 
     "Using qibo create a quantum circuit with three qbits, with wire names A, B and C, finally draw the circuit." : {
-        "expected_output" : ["A: ─────\nB: ─────\nC: ─────"],
+        "expected_output" : ["A: ─\nB: ─\nC: ─"],
         "expected_sources" : ["qiboKnow/qibo/doc/source/code-examples/examples.rst",
                               "qiboKnow/qibo/src/qibo/models/circuit.py"]
     },
@@ -300,7 +300,7 @@
     },
 
     "Write a unit test to verify the qibo function that performs the Schmidt decomposition. Create a two-qubit Bell state explicitly as a NumPy array with the values `[1/√2, 0, 0, 1/√2]`, corresponding to the state `(1/√2) * (|00⟩ + |11⟩)`. Perform the Schmidt decomposition of this state with a partition on the first qubit, and assert that the resulting Schmidt coefficients array has length 2. Finally, execute the test function at the end." : {
-        "expected_output" : "",
+        "expected_output" : "[0.70710678 0.70710678]",
         "expected_sources" : ["qiboKnow/qibo/src/qibo/quantum_info/test_quantum_info_linalg_operations.py",
                               "qiboKnow/qibo/src/qibo/quantum_info/linalg_operation.py",
                               "qiboKnow/qibo/doc/source/api-reference/qibo.rst"]

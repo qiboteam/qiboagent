@@ -17,7 +17,6 @@ import pickle
 import tempfile
 import subprocess, requests
 import sys
-from difflib import SequenceMatcher
 from tqdm import tqdm
 import nbformat
 from rank_bm25 import BM25Okapi
@@ -29,6 +28,7 @@ from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.rate_limiters import InMemoryRateLimiter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import OllamaLLM
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -117,7 +117,10 @@ def initialize_llm(settings: dict):
         
         return OllamaLLM(model=model_name, base_url=base_url, temperature=0.0)
     elif settings["llm"]["provider"] == "google_genai":
-        return ChatGoogleGenerativeAI(model=settings["llm"]["model_name"], temperature=0.0, google_api_key=settings["llm"]["api_key"])
+        # Spread the requests to stay within the Gemini API rate limit (requests per minute)
+        rate_limiter = InMemoryRateLimiter(requests_per_second=float(os.environ.get("GEMINI_RPM", "8")) / 60)
+        return ChatGoogleGenerativeAI(model=settings["llm"]["model_name"], temperature=0.0, google_api_key=settings["llm"]["api_key"],
+                                      rate_limiter=rate_limiter)
     else:
         raise ValueError(f"Unsupported LLM provider: {settings['llm']['provider']}")
     
@@ -586,7 +589,7 @@ RAG CONTEXT:\n
 
     results = []
     
-    start_from = 48
+    start_from = 1
     for idx, q in enumerate(tqdm(questions[start_from-1:], desc="Processing questions"), start=start_from):
         try:
             response = qa_chain.invoke(q)
@@ -654,10 +657,9 @@ RAG CONTEXT:\n
             "sources": sources,      
             "output": code_output
         })
+        # Saved after every question, so partial results survive a crash
+        save_json(results, output_file)
 
-    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
     logger.info(f"Saved {len(results)} results to {output_file}")
     return results
 
@@ -718,6 +720,16 @@ def get_pylint_score(
     return 0.0
 
 
+def save_json(data, path: str):
+    """Write data to a JSON file atomically, so that a crash never leaves a truncated file."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    tmp_path.replace(path)
+
+
 def _normalize_and_extract(text: str) -> str:
     """
     Normalize text by:
@@ -758,33 +770,64 @@ def _normalize_and_extract(text: str) -> str:
     return text.strip()
 
 
-def _fuzzy_contains(expected: str, actual: str, threshold: float = 0.85) -> bool:
+_NUMBER = re.compile(r"[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?")
+
+
+def _tokenize(text: str) -> list:
+    """Split text into numbers (as floats) and single non-space characters."""
+    tokens, pos = [], 0
+    for m in _NUMBER.finditer(text):
+        tokens.extend(c for c in text[pos:m.start()] if not c.isspace())
+        tokens.append(float(m.group()))
+        pos = m.end()
+    tokens.extend(c for c in text[pos:] if not c.isspace())
+    return tokens
+
+
+def _numeric_match(expected_norm: str, actual_norm: str, rtol: float = 1e-5, atol: float = 1e-8) -> bool:
     """
-    Check if expected is contained in actual using fuzzy matching.
-    Returns True if:
-    1. Exact substring match
-    2. Fuzzy similarity above threshold
+    Check if the expected output appears in the actual output with the same text and numbers equal
+    within tolerance (numpy.isclose defaults), so that signed zeros (-0.) and floating point noise
+    (e.g. 1e-17 imaginary parts) in the printed result are not counted as errors.
     """
-    
+    exp = _tokenize(expected_norm)
+    act = _tokenize(actual_norm)
+    if not any(isinstance(t, float) for t in exp):
+        return False
+    n = len(exp)
+    for start in range(len(act) - n + 1):
+        for e, a in zip(exp, act[start:start + n]):
+            if isinstance(e, float) != isinstance(a, float):
+                break
+            if isinstance(e, float):
+                if abs(a - e) > atol + rtol * abs(e):
+                    break
+            elif a != e:
+                break
+        else:
+            return True
+    return False
+
+
+def _output_matches(expected: str, actual: str) -> bool:
+    """
+    Check if the normalized expected output is contained in the normalized actual output: exact
+    substring, or same text with numbers equal within tolerance. Empty strings never match.
+    """
     expected_norm = _normalize_and_extract(expected)
     actual_norm = _normalize_and_extract(actual)
-    
-    # Exact substring match 
-    if expected_norm in actual_norm:
-        return True
-    
-    # Reverse substring match
-    if actual_norm in expected_norm:
-        return True
-
-    # Fuzzy matching to handle small differences
-    # E.g.: "0.70710678" vs "0.707107"
-    ratio = SequenceMatcher(None, expected_norm, actual_norm).ratio()
-    return ratio >= threshold
+    if not expected_norm or not actual_norm:
+        return False
+    return expected_norm in actual_norm or _numeric_match(expected_norm, actual_norm)
 
 
 def auto_scoring(results: list, golden_answers: dict, model_name: str, save: bool = False, scoring_path: str | None = None):
-    """Score batch answers with robust text comparison. Always executes extracted code."""
+    """
+    Score batch answers with the same strict criterion used by every pipeline (no-RAG, semantic, hybrid).
+    An answer is correct only if its code block runs successfully (exit code 0, no timeout) and one of the
+    expected outputs, after normalization, is an exact substring of the produced stdout + stderr.
+    """
+    path = (scoring_path or f"./scoring/scoring_hybrid_json/scoring_{model_name.replace('/', '_')}.json") if save else None
     scores = []
     for idx, result in enumerate(results, start=1):
         question = result["question"]
@@ -798,11 +841,12 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str, save: boo
             "grounding": 0,
             "hallucination": 1,
             "pylint score": 0.0,
+            "exit_code": None,
             "error": None
         }
         answer = result["answer"]
         raw_expected_output = golden_answer.get("expected_output", "")
-        
+
         if isinstance(raw_expected_output, str):
             expected_outputs = [raw_expected_output.strip()] if raw_expected_output.strip() else []
         elif isinstance(raw_expected_output, list):
@@ -814,7 +858,8 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str, save: boo
 
         stdout = ""
         stderr = ""
-    
+        exit_code = None
+
         if code:
             with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as tmp:
                 tmp.write(code)
@@ -829,6 +874,7 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str, save: boo
                 )
                 stdout = proc.stdout or ""
                 stderr = proc.stderr or ""
+                exit_code = proc.returncode
                 logger.debug(f"Code execution completed for question {idx}")
             except subprocess.TimeoutExpired:
                 stderr = "Execution timeout (30s)"
@@ -841,18 +887,17 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str, save: boo
                     Path(tmp_path).unlink()
                 except Exception:
                     pass
-        else:
-            stdout = result.get("output", {}).get("stdout", "") if result.get("output") else ""
-            stderr = result.get("output", {}).get("stderr", "") if result.get("output") else ""
 
         combined = (stdout + " " + stderr).strip()
-        
+        score["exit_code"] = exit_code
+
         if stderr and not any(k in stderr for k in ("DeprecationWarning", "FutureWarning", "UserWarning")):
             score["error"] = stderr
 
-        if expected_outputs:
+        # No code, timeouts and failed executions are never correct, even if a partial output matches
+        if exit_code == 0 and expected_outputs:
             for eo in expected_outputs:
-                if _fuzzy_contains(eo, combined, threshold=0.85):
+                if _output_matches(eo, combined):
                     score["correctness"] = 1
                     break
 
@@ -884,12 +929,11 @@ def auto_scoring(results: list, golden_answers: dict, model_name: str, save: boo
             score["grounding"] /= len(expected_sources)
 
         scores.append(score)
+        # Saved after every question, so partial results survive a crash
+        if save:
+            save_json(scores, path)
 
     if save:
-        path = scoring_path or f"./scoring/scoring_hybrid_json/scoring_{model_name.replace('/', '_')}.json"
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(scores, f, indent=2, ensure_ascii=False)
         logger.info(f"Saved scoring results to {path}")
 
     return scores
@@ -916,7 +960,8 @@ def main():
     # Clone Qibo repository if not already present
     if not qibo_dir.exists():
         logger.info("Cloning Qibo repository...")
-        subprocess.run(["git","clone","https://github.com/qiboteam/qibo.git",str(qibo_dir)], check=True)
+        # Pinned to the same Qibo version installed in the environment (pyproject.toml)
+        subprocess.run(["git","clone","--branch","v0.2.23","--depth","1","https://github.com/qiboteam/qibo.git",str(qibo_dir)], check=True)
     persist_dir = settings.get("persist_dir", "./kb_chroma")
     questions_file = settings.get("questions_file", "./settings_json/questions_2.json")
     output_file = f"./answers/answers_hybrid_json/answers_{settings['llm']['model_name'].replace('/', '_')}.json"
